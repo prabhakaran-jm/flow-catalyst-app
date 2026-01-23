@@ -23,6 +23,12 @@ export const env = {
    * Find it in your Supabase project settings > API
    */
   SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY_HERE',
+
+  /**
+   * Base URL for Supabase Edge Functions
+   * Example: https://your-project-id.supabase.co/functions/v1
+   */
+  EDGE_FUNCTION_BASE_URL: 'YOUR_EDGE_FUNCTION_BASE_URL_HERE',
 } as const;
 
 /**
