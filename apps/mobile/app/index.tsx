@@ -1,8 +1,20 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { theme } from '@/theme';
+import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
 export default function Index() {
+  const router = useRouter();
+  const { plan } = useRevenueCat();
+
+  const handleCreatePress = () => {
+    if (plan === 'free') {
+      router.push('/paywall');
+    } else {
+      router.push('/catalyst/create');
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -19,10 +31,8 @@ export default function Index() {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.createButton}>
-          <Link href="/catalyst/create" asChild>
-            <Text style={styles.createButtonText}>+ Create Catalyst</Text>
-          </Link>
+        <TouchableOpacity style={styles.createButton} onPress={handleCreatePress}>
+          <Text style={styles.createButtonText}>+ Create Catalyst</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

@@ -116,17 +116,226 @@ export default function CatalystDetail() {
         )}
       </View>
 
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { theme } from '@/theme';
+import { runCatalyst } from '@/src/lib/api';
+import { useSupabase } from '@/src/providers/SupabaseProvider';
+import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
+import { getTodayRunCount, hasReachedDailyLimit, incrementRunCount } from '@/src/lib/runLimits';
+
+export default function CatalystDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const { loading: authLoading } = useSupabase();
+  const { plan } = useRevenueCat();
+  const [inputs, setInputs] = useState<Record<string, any>>({});
+  const [inputKey, setInputKey] = useState('');
+  const [inputValue, setInputValue] = useState('');
+  const [output, setOutput] = useState<string | null>(null);
+  const [promptDebug, setPromptDebug] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [runCount, setRunCount] = useState<number | null>(null);
+  const [limitReached, setLimitReached] = useState(false);
+
+  // Check run count on mount
+  useEffect(() => {
+    const checkLimit = async () => {
+      if (plan === 'free') {
+        const count = await getTodayRunCount();
+        const reached = await hasReachedDailyLimit();
+        setRunCount(count);
+        setLimitReached(reached);
+      }
+    };
+    checkLimit();
+  }, [plan]);
+
+  const handleAddInput = () => {
+    if (inputKey.trim()) {
+      setInputs((prev) => ({
+        ...prev,
+        [inputKey.trim()]: inputValue.trim() || inputValue,
+      }));
+      setInputKey('');
+      setInputValue('');
+    }
+  };
+
+  const handleRemoveInput = (key: string) => {
+    setInputs((prev) => {
+      const newInputs = { ...prev };
+      delete newInputs[key];
+      return newInputs;
+    });
+  };
+
+  const handleRun = async () => {
+    if (!id) return;
+
+    // Check plan and limits
+    if (plan === 'free') {
+      const reached = await hasReachedDailyLimit();
+      if (reached) {
+        router.push('/paywall');
+        return;
+      }
+    }
+
+    setLoading(true);
+    setError(null);
+    setOutput(null);
+    setPromptDebug(null);
+
+    try {
+      const result = await runCatalyst({
+        catalystId: id,
+        inputs,
+      });
+      setOutput(result.output);
+      setPromptDebug(result.promptDebug);
+
+      // Increment run count for free users
+      if (plan === 'free') {
+        const newCount = await incrementRunCount();
+        setRunCount(newCount);
+        if (newCount >= 3) {
+          setLimitReached(true);
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to run catalyst');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={theme.colors.accent} />
+      </View>
+    );
+  }
+
+  const isFreeUser = plan === 'free';
+  const showLimitWarning = isFreeUser && limitReached;
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Run Catalyst</Text>
+        <Text style={styles.id}>ID: {id}</Text>
+        {isFreeUser && runCount !== null && (
+          <Text style={styles.runCount}>
+            Runs today: {runCount}/3
+          </Text>
+        )}
+      </View>
+
+      {showLimitWarning && (
+        <View style={styles.limitWarning}>
+          <Text style={styles.limitWarningText}>
+            You've reached your daily limit of 3 runs. Upgrade to Pro for unlimited runs!
+          </Text>
+          <TouchableOpacity
+            style={styles.upgradeButton}
+            onPress={() => router.push('/paywall')}
+          >
+            <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Inputs</Text>
+        
+        <View style={styles.inputRow}>
+          <TextInput
+            style={[styles.input, styles.inputKey]}
+            placeholder="Key"
+            placeholderTextColor={theme.colors.textSecondary}
+            value={inputKey}
+            onChangeText={setInputKey}
+          />
+          <TextInput
+            style={[styles.input, styles.inputValue]}
+            placeholder="Value"
+            placeholderTextColor={theme.colors.textSecondary}
+            value={inputValue}
+            onChangeText={setInputValue}
+            multiline
+          />
+          <TouchableOpacity style={styles.addButton} onPress={handleAddInput}>
+            <Text style={styles.addButtonText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        {Object.entries(inputs).length > 0 && (
+          <View style={styles.inputsList}>
+            {Object.entries(inputs).map(([key, value]) => (
+              <View key={key} style={styles.inputItem}>
+                <View style={styles.inputItemContent}>
+                  <Text style={styles.inputItemKey}>{key}:</Text>
+                  <Text style={styles.inputItemValue}>{String(value)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => handleRemoveInput(key)}
+                >
+                  <Text style={styles.removeButtonText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+
       <TouchableOpacity
-        style={[styles.runButton, loading && styles.runButtonDisabled]}
+        style={[
+          styles.runButton,
+          (loading || Object.keys(inputs).length === 0 || showLimitWarning) && styles.runButtonDisabled
+        ]}
         onPress={handleRun}
-        disabled={loading || Object.keys(inputs).length === 0}
+        disabled={loading || Object.keys(inputs).length === 0 || showLimitWarning}
       >
         {loading ? (
           <ActivityIndicator color={theme.colors.background} />
         ) : (
-          <Text style={styles.runButtonText}>Run Catalyst</Text>
+          <Text style={styles.runButtonText}>
+            {showLimitWarning ? 'Daily Limit Reached' : 'Run Catalyst'}
+          </Text>
         )}
       </TouchableOpacity>
+
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {output && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Output</Text>
+          <View style={styles.outputContainer}>
+            <Text style={styles.outputText}>{output}</Text>
+          </View>
+        </View>
+      )}
+
+      {promptDebug && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Prompt Debug</Text>
+          <View style={styles.debugContainer}>
+            <Text style={styles.debugText}>{promptDebug}</Text>
+          </View>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
 
       {error && (
         <View style={styles.errorContainer}>
@@ -174,6 +383,35 @@ const styles = StyleSheet.create({
   id: {
     ...theme.typography.bodySmall,
     color: theme.colors.textSecondary,
+  },
+  runCount: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+  },
+  limitWarning: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  limitWarningText: {
+    ...theme.typography.body,
+    color: '#92400E',
+    marginBottom: theme.spacing.sm,
+  },
+  upgradeButton: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  upgradeButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.background,
+    fontWeight: '600',
   },
   section: {
     marginBottom: theme.spacing.lg,

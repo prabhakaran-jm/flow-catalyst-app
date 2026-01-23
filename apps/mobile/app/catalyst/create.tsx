@@ -1,13 +1,23 @@
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { theme } from '@/theme';
 import { createCatalyst } from '@/src/lib/api';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
+import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
 export default function CreateCatalyst() {
   const router = useRouter();
   const { loading: authLoading } = useSupabase();
+  const { plan } = useRevenueCat();
+
+  // Redirect free users to paywall
+  useEffect(() => {
+    if (!authLoading && plan === 'free') {
+      router.replace('/paywall');
+    }
+  }, [plan, authLoading, router]);
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [inputsJson, setInputsJson] = useState('');
@@ -16,6 +26,12 @@ export default function CreateCatalyst() {
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
+    // Double-check plan (shouldn't reach here for free users, but safety check)
+    if (plan === 'free') {
+      router.push('/paywall');
+      return;
+    }
+
     if (!name.trim() || !promptTemplate.trim()) {
       setError('Name and prompt template are required');
       return;
@@ -59,7 +75,7 @@ export default function CreateCatalyst() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || plan === 'free') {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
