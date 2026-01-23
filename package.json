@@ -1,0 +1,24 @@
+{
+  "name": "flow-catalyst-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Flow Catalyst - A minimalist, mobile-first AI coaching app for productivity-focused creators",
+  "scripts": {
+    "dev": "pnpm --filter mobile dev",
+    "build": "pnpm --filter mobile build",
+    "lint": "pnpm --filter mobile lint"
+  },
+  "keywords": [
+    "expo",
+    "react-native",
+    "supabase",
+    "monorepo"
+  ],
+  "author": "Prabhakaran Jayaraman Masani",
+  "license": "MIT",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
