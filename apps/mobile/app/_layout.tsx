@@ -42,9 +42,13 @@ export default function RootLayout() {
               },
             }}
           >
+            <Stack.Screen name="signin" options={{ title: 'Sign In', headerShown: false }} />
+            <Stack.Screen name="auth/callback" options={{ title: 'Signing In', headerShown: false }} />
             <Stack.Screen name="index" options={{ title: 'Catalysts' }} />
             <Stack.Screen name="onboarding" options={{ title: 'Welcome' }} />
+            <Stack.Screen name="profile" options={{ title: 'Edit Profile' }} />
             <Stack.Screen name="catalyst/[id]" options={{ title: 'Run Catalyst' }} />
+            <Stack.Screen name="catalyst/[id]/edit" options={{ title: 'Edit Catalyst' }} />
             <Stack.Screen name="catalyst/create" options={{ title: 'Create Catalyst' }} />
             <Stack.Screen name="paywall" options={{ title: 'Upgrade' }} />
           </Stack>

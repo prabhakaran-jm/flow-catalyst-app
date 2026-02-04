@@ -13,8 +13,10 @@ build/
 dist/
 *.local
 
-# Environment variables
+# Environment variables (never commit secrets)
 .env
+.env.*
+!.env.example
 .env.local
 .env.development.local
 .env.test.local
@@ -84,3 +86,4 @@ supabase/.env
 .turbo/
 .next/
 out/
+*.pem

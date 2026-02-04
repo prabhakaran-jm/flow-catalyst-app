@@ -2,15 +2,21 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Activi
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { theme } from '@/theme';
-import { createCatalyst } from '@/src/lib/api';
+import { fetchProfile, updateProfile } from '@/src/lib/api';
 import { showAlert } from '@/src/lib/alert';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
-import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
-export default function CreateCatalyst() {
+export default function ProfileScreen() {
   const router = useRouter();
   const { loading: authLoading, user } = useSupabase();
-  const { plan } = useRevenueCat();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form state
+  const [domain, setDomain] = useState('');
+  const [workStyle, setWorkStyle] = useState('');
+  const [valuesInput, setValuesInput] = useState('');
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
@@ -19,72 +25,64 @@ export default function CreateCatalyst() {
     }
   }, [user, authLoading, router]);
 
-  // Redirect free users to paywall
+  // Load profile on mount
   useEffect(() => {
-    if (!authLoading && user && plan === 'free') {
-      router.replace('/paywall');
-    }
-  }, [plan, authLoading, user, router]);
+    const loadProfile = async () => {
+      if (!user) return;
 
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [inputsJson, setInputsJson] = useState('');
-  const [promptTemplate, setPromptTemplate] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSave = async () => {
-    // Double-check plan (shouldn't reach here for free users, but safety check)
-    if (plan === 'free') {
-      router.push('/paywall');
-      return;
-    }
-
-    if (!name.trim() || !promptTemplate.trim()) {
-      setError('Name and prompt template are required');
-      return;
-    }
-
-    let parsedInputs: any[] = [];
-    if (inputsJson.trim()) {
       try {
-        parsedInputs = JSON.parse(inputsJson);
-        if (!Array.isArray(parsedInputs)) {
-          setError('inputs_json must be a valid JSON array');
-          return;
+        setLoading(true);
+        const profile = await fetchProfile();
+        
+        if (profile) {
+          setDomain(profile.domain || '');
+          setWorkStyle(profile.work_style || '');
+          setValuesInput(profile.values?.join(', ') || '');
         }
       } catch (err) {
-        setError('Invalid JSON format for inputs. Must be a valid JSON array.');
-        return;
+        console.error('Failed to load profile:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load profile');
+      } finally {
+        setLoading(false);
       }
-    }
+    };
 
-    setLoading(true);
+    if (user) {
+      loadProfile();
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!user) return;
+
+    setSaving(true);
     setError(null);
 
     try {
-      console.log('Creating catalyst...');
-      const catalyst = await createCatalyst({
-        name: name.trim(),
-        description: description.trim() || undefined,
-        inputs_json: parsedInputs,
-        prompt_template: promptTemplate.trim(),
+      // Parse values from comma-separated string
+      const values = valuesInput
+        .split(',')
+        .map(v => v.trim())
+        .filter(v => v.length > 0);
+
+      await updateProfile({
+        domain: domain.trim() || null,
+        work_style: workStyle.trim() || null,
+        values: values.length > 0 ? values : null,
       });
 
-      console.log('Catalyst created:', catalyst);
-      showAlert('Success', 'Catalyst created successfully!', () => router.back());
+      showAlert('Success', 'Profile updated successfully!', () => router.back());
     } catch (err) {
-      console.error('Error creating catalyst:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create catalyst';
-      console.error('Error message:', errorMessage);
+      console.error('Error saving profile:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save profile';
       setError(errorMessage);
       showAlert('Error', errorMessage);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (authLoading || plan === 'free') {
+  if (authLoading || loading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
@@ -94,69 +92,64 @@ export default function CreateCatalyst() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Edit Profile</Text>
+        <Text style={styles.subtitle}>
+          Your profile helps personalize AI responses in catalysts
+        </Text>
+      </View>
+
       <View style={styles.form}>
         <View style={styles.field}>
-          <Text style={styles.label}>Name *</Text>
+          <Text style={styles.label}>Domain</Text>
+          <Text style={styles.hint}>
+            Your area of work or expertise (e.g., "Software Development", "Marketing")
+          </Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter catalyst name"
+            placeholder="e.g., Software Development"
             placeholderTextColor={theme.colors.textSecondary}
-            value={name}
+            value={domain}
             onChangeText={(text) => {
-              setName(text);
+              setDomain(text);
               setError(null);
             }}
           />
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
+          <Text style={styles.label}>Work Style</Text>
+          <Text style={styles.hint}>
+            How you prefer to work (e.g., "Agile", "Remote-first", "Deep Focus")
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g., Agile, Remote-first"
+            placeholderTextColor={theme.colors.textSecondary}
+            value={workStyle}
+            onChangeText={(text) => {
+              setWorkStyle(text);
+              setError(null);
+            }}
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Values</Text>
+          <Text style={styles.hint}>
+            Comma-separated list of your core values (e.g., "Innovation, Collaboration, Work-life balance")
+          </Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder="Describe what this catalyst does"
+            placeholder="e.g., Innovation, Collaboration, Work-life balance"
             placeholderTextColor={theme.colors.textSecondary}
-            value={description}
-            onChangeText={setDescription}
+            value={valuesInput}
+            onChangeText={(text) => {
+              setValuesInput(text);
+              setError(null);
+            }}
             multiline
             numberOfLines={3}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Inputs JSON (Array)</Text>
-          <Text style={styles.hint}>
-            Example: {`[{"name": "task", "type": "string"}]`}
-          </Text>
-          <TextInput
-            style={[styles.input, styles.textArea, styles.codeInput]}
-            placeholder='[{"name": "input1", "type": "string"}]'
-            placeholderTextColor={theme.colors.textSecondary}
-            value={inputsJson}
-            onChangeText={(text) => {
-              setInputsJson(text);
-              setError(null);
-            }}
-            multiline
-            numberOfLines={6}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Prompt Template *</Text>
-          <Text style={styles.hint}>
-            Use {`{inputs}`} to reference inputs in your template
-          </Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Enter the prompt template for this catalyst"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={promptTemplate}
-            onChangeText={(text) => {
-              setPromptTemplate(text);
-              setError(null);
-            }}
-            multiline
-            numberOfLines={8}
           />
         </View>
 
@@ -171,19 +164,19 @@ export default function CreateCatalyst() {
         <TouchableOpacity
           style={styles.cancelButton}
           onPress={() => router.back()}
-          disabled={loading}
+          disabled={saving}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           onPress={handleSave}
-          disabled={loading || !name.trim() || !promptTemplate.trim()}
+          disabled={saving}
         >
-          {loading ? (
+          {saving ? (
             <ActivityIndicator color={theme.colors.background} />
           ) : (
-            <Text style={styles.saveButtonText}>Create</Text>
+            <Text style={styles.saveButtonText}>Save</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -199,11 +192,23 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.spacing.md,
   },
+  header: {
+    marginBottom: theme.spacing.xl,
+  },
+  title: {
+    ...theme.typography.h1,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  subtitle: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+  },
   form: {
     marginBottom: theme.spacing.lg,
   },
   field: {
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   label: {
     ...theme.typography.body,
@@ -227,12 +232,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   textArea: {
-    minHeight: 100,
+    minHeight: 80,
     textAlignVertical: 'top',
-  },
-  codeInput: {
-    fontFamily: 'monospace',
-    fontSize: 14,
   },
   errorContainer: {
     backgroundColor: '#FEE2E2',

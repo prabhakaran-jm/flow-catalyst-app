@@ -1,44 +1,65 @@
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { theme } from '@/theme';
-import { createCatalyst } from '@/src/lib/api';
+import { fetchCatalyst, updateCatalyst, Catalyst } from '@/src/lib/api';
 import { showAlert } from '@/src/lib/alert';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
-export default function CreateCatalyst() {
+export default function EditCatalyst() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { loading: authLoading, user } = useSupabase();
   const { plan } = useRevenueCat();
 
-  // Redirect to sign-in if not authenticated
+  const [catalyst, setCatalyst] = useState<Catalyst | null>(null);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [inputsJson, setInputsJson] = useState('');
+  const [promptTemplate, setPromptTemplate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [loadingCatalyst, setLoadingCatalyst] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace('/signin');
     }
   }, [user, authLoading, router]);
 
-  // Redirect free users to paywall
   useEffect(() => {
     if (!authLoading && user && plan === 'free') {
       router.replace('/paywall');
     }
   }, [plan, authLoading, user, router]);
 
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [inputsJson, setInputsJson] = useState('');
-  const [promptTemplate, setPromptTemplate] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const load = async () => {
+      if (!id || !user) return;
+      try {
+        setLoadingCatalyst(true);
+        const data = await fetchCatalyst(id);
+        setCatalyst(data);
+        if (data.owner_id !== user.id) {
+          setError('You can only edit your own catalysts');
+          return;
+        }
+        setName(data.name);
+        setDescription(data.description || '');
+        setInputsJson(JSON.stringify(data.inputs_json || [], null, 2));
+        setPromptTemplate(data.prompt_template || '');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load catalyst');
+      } finally {
+        setLoadingCatalyst(false);
+      }
+    };
+    load();
+  }, [id, user]);
 
   const handleSave = async () => {
-    // Double-check plan (shouldn't reach here for free users, but safety check)
-    if (plan === 'free') {
-      router.push('/paywall');
-      return;
-    }
+    if (!id || plan === 'free') return;
 
     if (!name.trim() || !promptTemplate.trim()) {
       setError('Name and prompt template are required');
@@ -63,20 +84,18 @@ export default function CreateCatalyst() {
     setError(null);
 
     try {
-      console.log('Creating catalyst...');
-      const catalyst = await createCatalyst({
+      await updateCatalyst(id, {
         name: name.trim(),
         description: description.trim() || undefined,
         inputs_json: parsedInputs,
         prompt_template: promptTemplate.trim(),
       });
 
-      console.log('Catalyst created:', catalyst);
-      showAlert('Success', 'Catalyst created successfully!', () => router.back());
+      showAlert('Success', 'Catalyst updated successfully!', () => {
+        router.replace(`/catalyst/${id}`);
+      });
     } catch (err) {
-      console.error('Error creating catalyst:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create catalyst';
-      console.error('Error message:', errorMessage);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update catalyst';
       setError(errorMessage);
       showAlert('Error', errorMessage);
     } finally {
@@ -84,11 +103,24 @@ export default function CreateCatalyst() {
     }
   };
 
-  if (authLoading || plan === 'free') {
+  if (authLoading || loadingCatalyst || plan === 'free') {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
       </View>
+    );
+  }
+
+  if (!catalyst || error) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error || 'Catalyst not found'}</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     );
   }
 
@@ -183,7 +215,7 @@ export default function CreateCatalyst() {
           {loading ? (
             <ActivityIndicator color={theme.colors.background} />
           ) : (
-            <Text style={styles.saveButtonText}>Create</Text>
+            <Text style={styles.saveButtonText}>Save Changes</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -245,6 +277,16 @@ const styles = StyleSheet.create({
   errorText: {
     ...theme.typography.body,
     color: theme.colors.error,
+  },
+  backButton: {
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.accent,
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',

@@ -29,6 +29,16 @@ export const env = {
    * Example: https://your-project-id.supabase.co/functions/v1
    */
   EDGE_FUNCTION_BASE_URL: 'YOUR_EDGE_FUNCTION_BASE_URL_HERE',
+
+  /**
+   * RevenueCat API Key
+   * Get this from RevenueCat Dashboard > Project Settings > API Keys
+   * Use different keys for iOS and Android
+   * 
+   * For Expo, you can use Platform.select() or set via environment variables
+   */
+  REVENUECAT_API_KEY_IOS: 'YOUR_REVENUECAT_IOS_API_KEY_HERE',
+  REVENUECAT_API_KEY_ANDROID: 'YOUR_REVENUECAT_ANDROID_API_KEY_HERE',
 } as const;
 
 /**

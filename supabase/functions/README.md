@@ -22,10 +22,12 @@ Executes a catalyst with provided inputs and returns output.
 **Response**:
 ```json
 {
-  "output": "Mock output for now - AI integration pending",
-  "promptDebug": "Template: ...\nInputs: ...\nUser Profile: ..."
+  "output": "AI-generated output based on the prompt template and inputs",
+  "promptDebug": "Template: ...\nInputs: ...\nUser Profile: ...\n\nFinal Prompt: ..."
 }
 ```
+
+**AI Integration**: Uses OpenAI (default) or Anthropic to generate responses. See `AI_INTEGRATION_SETUP.md` for configuration.
 
 ### create-catalyst
 Creates a new catalyst for the authenticated user.
@@ -47,8 +49,30 @@ Creates a new catalyst for the authenticated user.
 ## Environment Variables
 
 Set these in your Supabase project settings:
+
+### Required
 - `SUPABASE_URL` - Your Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Your Supabase service role key (keep secret!)
+
+### AI Integration (Required for run-catalyst)
+- `AI_PROVIDER` - `openrouter` (default, free models), `openai`, or `anthropic`
+- `OPENROUTER_API_KEY` - Optional OpenRouter API key (free models work without it)
+- OR `OPENAI_API_KEY` - Your OpenAI API key (if using OpenAI)
+- OR `ANTHROPIC_API_KEY` - Your Anthropic API key (if using Anthropic)
+
+### Optional AI Configuration
+- `OPENROUTER_MODEL` - Model name (default: `openrouter/free` - auto-selects free models)
+- `OPENROUTER_MAX_TOKENS` - Max tokens (default: `1000`)
+- `OPENROUTER_TEMPERATURE` - Temperature (default: `0.7`)
+- `OPENROUTER_HTTP_REFERER` - Optional app URL for attribution
+- `OPENROUTER_X_TITLE` - Optional app name for attribution
+- `OPENAI_MODEL` - Model name (default: `gpt-4o-mini`)
+- `OPENAI_MAX_TOKENS` - Max tokens (default: `1000`)
+- `OPENAI_TEMPERATURE` - Temperature (default: `0.7`)
+- `ANTHROPIC_MODEL` - Model name (default: `claude-3-5-sonnet-20241022`)
+- `ANTHROPIC_MAX_TOKENS` - Max tokens (default: `1000`)
+
+See `AI_INTEGRATION_SETUP.md` for detailed setup instructions.
 
 ## Authentication
 

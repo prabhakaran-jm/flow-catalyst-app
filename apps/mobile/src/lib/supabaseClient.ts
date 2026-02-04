@@ -22,7 +22,7 @@ function createSupabaseClient(): SupabaseClient {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: true, // Enable to handle magic link redirects
     },
   });
 }

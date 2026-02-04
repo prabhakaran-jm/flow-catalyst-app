@@ -87,12 +87,8 @@ supabase migration up
 ### 5. Deploy Edge Functions (Local)
 
 ```bash
-# Deploy all functions
-supabase functions serve
-
-# Or deploy specific function
-supabase functions serve run-catalyst
-supabase functions serve create-catalyst
+# Serve functions with env vars from .env (required for OpenRouter/AI)
+supabase functions serve create-catalyst run-catalyst --no-verify-jwt --env-file .env
 ```
 
 ### 6. Run Expo Mobile App
@@ -121,8 +117,8 @@ Edge Functions are located in `supabase/functions/`:
 ### Testing Edge Functions Locally
 
 ```bash
-# Start functions server
-supabase functions serve
+# Start functions server (--env-file loads .env for AI/OpenRouter API keys)
+supabase functions serve create-catalyst run-catalyst --no-verify-jwt --env-file .env
 
 # Test with curl (replace with your JWT token)
 curl -X POST http://localhost:54321/functions/v1/run-catalyst \
@@ -171,6 +167,19 @@ eas build --platform android
 
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY`: Service role key (keep secret!)
+
+## Testing & Deployment
+
+- **Quick Start**: See `QUICK_START.md` for immediate testing steps
+- **Testing Guide**: See `STEP_BY_STEP_TESTING.md` for detailed testing walkthrough
+- **Deployment Guide**: See `DEPLOYMENT_GUIDE.md` for production deployment
+- **Testing Checklist**: See `TESTING_CHECKLIST.md` for comprehensive test cases
+
+## Setup Guides
+
+- **Local Supabase**: See `LOCAL_SUPABASE_SETUP.md`
+- **AI Integration**: See `AI_INTEGRATION_SETUP.md`
+- **RevenueCat**: See `REVENUECAT_SETUP.md`
 
 ## License
 

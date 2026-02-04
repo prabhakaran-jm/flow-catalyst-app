@@ -1,144 +1,59 @@
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useState, useEffect, useCallback } from 'react';
 import { theme } from '@/theme';
-import { runCatalyst } from '@/src/lib/api';
-import { useSupabase } from '@/src/providers/SupabaseProvider';
-
-export default function CatalystDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { loading: authLoading } = useSupabase();
-  const [inputs, setInputs] = useState<Record<string, any>>({});
-  const [inputKey, setInputKey] = useState('');
-  const [inputValue, setInputValue] = useState('');
-  const [output, setOutput] = useState<string | null>(null);
-  const [promptDebug, setPromptDebug] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleAddInput = () => {
-    if (inputKey.trim()) {
-      setInputs((prev) => ({
-        ...prev,
-        [inputKey.trim()]: inputValue.trim() || inputValue,
-      }));
-      setInputKey('');
-      setInputValue('');
-    }
-  };
-
-  const handleRemoveInput = (key: string) => {
-    setInputs((prev) => {
-      const newInputs = { ...prev };
-      delete newInputs[key];
-      return newInputs;
-    });
-  };
-
-  const handleRun = async () => {
-    if (!id) return;
-
-    setLoading(true);
-    setError(null);
-    setOutput(null);
-    setPromptDebug(null);
-
-    try {
-      const result = await runCatalyst({
-        catalystId: id,
-        inputs,
-      });
-      setOutput(result.output);
-      setPromptDebug(result.promptDebug);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to run catalyst');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (authLoading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={theme.colors.accent} />
-      </View>
-    );
-  }
-
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Run Catalyst</Text>
-        <Text style={styles.id}>ID: {id}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Inputs</Text>
-        
-        <View style={styles.inputRow}>
-          <TextInput
-            style={[styles.input, styles.inputKey]}
-            placeholder="Key"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={inputKey}
-            onChangeText={setInputKey}
-          />
-          <TextInput
-            style={[styles.input, styles.inputValue]}
-            placeholder="Value"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={inputValue}
-            onChangeText={setInputValue}
-            multiline
-          />
-          <TouchableOpacity style={styles.addButton} onPress={handleAddInput}>
-            <Text style={styles.addButtonText}>Add</Text>
-          </TouchableOpacity>
-        </View>
-
-        {Object.entries(inputs).length > 0 && (
-          <View style={styles.inputsList}>
-            {Object.entries(inputs).map(([key, value]) => (
-              <View key={key} style={styles.inputItem}>
-                <View style={styles.inputItemContent}>
-                  <Text style={styles.inputItemKey}>{key}:</Text>
-                  <Text style={styles.inputItemValue}>{String(value)}</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveInput(key)}
-                >
-                  <Text style={styles.removeButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { theme } from '@/theme';
-import { runCatalyst } from '@/src/lib/api';
+import { runCatalyst, fetchCatalyst, deleteCatalyst, Catalyst } from '@/src/lib/api';
+import { showAlert, showConfirm } from '@/src/lib/alert';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 import { getTodayRunCount, hasReachedDailyLimit, incrementRunCount } from '@/src/lib/runLimits';
+import Markdown from 'react-native-markdown-display';
 
 export default function CatalystDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { loading: authLoading } = useSupabase();
+  const { loading: authLoading, user } = useSupabase();
   const { plan } = useRevenueCat();
+
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/signin');
+    }
+  }, [user, authLoading, router]);
   const [inputs, setInputs] = useState<Record<string, any>>({});
   const [inputKey, setInputKey] = useState('');
   const [inputValue, setInputValue] = useState('');
+  const [catalyst, setCatalyst] = useState<Catalyst | null>(null);
+  const [loadingCatalyst, setLoadingCatalyst] = useState(true);
   const [output, setOutput] = useState<string | null>(null);
   const [promptDebug, setPromptDebug] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [runCount, setRunCount] = useState<number | null>(null);
   const [limitReached, setLimitReached] = useState(false);
+
+  const loadCatalyst = useCallback(async () => {
+    if (!id || !user) return;
+    try {
+      setLoadingCatalyst(true);
+      setError(null);
+      const data = await fetchCatalyst(id);
+      setCatalyst(data);
+    } catch (err) {
+      console.error('Failed to load catalyst:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load catalyst');
+    } finally {
+      setLoadingCatalyst(false);
+    }
+  }, [id, user]);
+
+  // Load catalyst on mount and when returning from edit
+  useFocusEffect(
+    useCallback(() => {
+      if (user) loadCatalyst();
+    }, [user, loadCatalyst])
+  );
 
   // Check run count on mount
   useEffect(() => {
@@ -170,6 +85,29 @@ export default function CatalystDetail() {
       delete newInputs[key];
       return newInputs;
     });
+  };
+
+  const handleEdit = () => {
+    if (id) router.push(`/catalyst/${id}/edit`);
+  };
+
+  const handleDelete = async () => {
+    if (!id || !catalyst) return;
+    if (user?.id !== catalyst.owner_id || catalyst.visibility === 'system') return;
+
+    const confirmed = await showConfirm(
+      'Delete Catalyst',
+      `Are you sure you want to delete "${catalyst.name}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteCatalyst(id);
+      showAlert('Deleted', 'Catalyst deleted successfully.', () => router.back());
+    } catch (err) {
+      console.error('Delete failed:', err);
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to delete catalyst');
+    }
   };
 
   const handleRun = async () => {
@@ -212,7 +150,7 @@ export default function CatalystDetail() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || loadingCatalyst) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
@@ -220,14 +158,42 @@ export default function CatalystDetail() {
     );
   }
 
+  if (!catalyst) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            {error || 'Catalyst not found'}
+          </Text>
+        </View>
+      </ScrollView>
+    );
+  }
+
   const isFreeUser = plan === 'free';
   const showLimitWarning = isFreeUser && limitReached;
+
+  const canEditDelete = user?.id === catalyst.owner_id && catalyst.visibility !== 'system';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>Run Catalyst</Text>
-        <Text style={styles.id}>ID: {id}</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>{catalyst.name}</Text>
+          {canEditDelete && (
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.headerActionButton} onPress={handleEdit}>
+                <Text style={styles.headerActionText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.headerActionButton, styles.headerDeleteButton]} onPress={handleDelete}>
+                <Text style={styles.headerDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+        {catalyst.description && (
+          <Text style={styles.description}>{catalyst.description}</Text>
+        )}
         {isFreeUser && runCount !== null && (
           <Text style={styles.runCount}>
             Runs today: {runCount}/3
@@ -320,7 +286,7 @@ export default function CatalystDetail() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Output</Text>
           <View style={styles.outputContainer}>
-            <Text style={styles.outputText}>{output}</Text>
+            <Markdown style={markdownStyles}>{output}</Markdown>
           </View>
         </View>
       )}
@@ -337,32 +303,18 @@ export default function CatalystDetail() {
   );
 }
 
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      {output && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Output</Text>
-          <View style={styles.outputContainer}>
-            <Text style={styles.outputText}>{output}</Text>
-          </View>
-        </View>
-      )}
-
-      {promptDebug && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Prompt Debug</Text>
-          <View style={styles.debugContainer}>
-            <Text style={styles.debugText}>{promptDebug}</Text>
-          </View>
-        </View>
-      )}
-    </ScrollView>
-  );
-}
+// Mobile-optimized markdown styles (compact, scannable)
+const markdownStyles = {
+  body: { color: theme.colors.text, fontSize: 15, lineHeight: 22 },
+  heading1: { fontSize: 20, fontWeight: '700' as const, color: theme.colors.text, marginTop: 12, marginBottom: 6 },
+  heading2: { fontSize: 17, fontWeight: '600' as const, color: theme.colors.text, marginTop: 10, marginBottom: 4 },
+  heading3: { fontSize: 15, fontWeight: '600' as const, color: theme.colors.text, marginTop: 8, marginBottom: 4 },
+  bullet_list: { marginBottom: 6 },
+  ordered_list: { marginBottom: 6 },
+  list_item: { marginBottom: 2 },
+  strong: { fontWeight: '700' as const, color: theme.colors.text },
+  paragraph: { marginBottom: 6 },
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -375,10 +327,40 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: theme.spacing.lg,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.xs,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  headerActionButton: {
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  headerActionText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.accent,
+    fontWeight: '600',
+  },
+  headerDeleteButton: {},
+  headerDeleteText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.error,
+    fontWeight: '600',
+  },
   title: {
     ...theme.typography.h2,
     color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
+    flex: 1,
+  },
+  description: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
   },
   id: {
     ...theme.typography.bodySmall,

@@ -1,9 +1,42 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { theme } from '@/theme';
+import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
 export default function Paywall() {
   const router = useRouter();
+  const { purchasePro, plan } = useRevenueCat();
+  const [loadingMonthly, setLoadingMonthly] = useState(false);
+  const [loadingYearly, setLoadingYearly] = useState(false);
+
+  const handlePurchase = async (period: 'monthly' | 'yearly') => {
+    try {
+      if (period === 'monthly') {
+        setLoadingMonthly(true);
+      } else {
+        setLoadingYearly(true);
+      }
+
+      await purchasePro();
+      
+      Alert.alert('Success', 'Subscription activated!', [
+        {
+          text: 'OK',
+          onPress: () => router.back(),
+        },
+      ]);
+    } catch (error) {
+      console.error('Purchase error:', error);
+      Alert.alert(
+        'Purchase Failed',
+        error instanceof Error ? error.message : 'Failed to complete purchase. Please try again.'
+      );
+    } finally {
+      setLoadingMonthly(false);
+      setLoadingYearly(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -19,8 +52,18 @@ export default function Paywall() {
           <Text style={styles.planName}>Monthly</Text>
           <Text style={styles.planPrice}>$9.99</Text>
           <Text style={styles.planPeriod}>per month</Text>
-          <TouchableOpacity style={styles.planButton}>
-            <Text style={styles.planButtonText}>Subscribe</Text>
+          <TouchableOpacity 
+            style={[styles.planButton, loadingMonthly && styles.planButtonDisabled]}
+            onPress={() => handlePurchase('monthly')}
+            disabled={loadingMonthly || plan === 'pro'}
+          >
+            {loadingMonthly ? (
+              <ActivityIndicator color={theme.colors.background} />
+            ) : (
+              <Text style={styles.planButtonText}>
+                {plan === 'pro' ? 'Current Plan' : 'Subscribe'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -30,8 +73,18 @@ export default function Paywall() {
           <Text style={styles.planPrice}>$79.99</Text>
           <Text style={styles.planPeriod}>per year</Text>
           <Text style={styles.savings}>Save 33%</Text>
-          <TouchableOpacity style={styles.planButtonFeatured}>
-            <Text style={styles.planButtonText}>Subscribe</Text>
+          <TouchableOpacity 
+            style={[styles.planButtonFeatured, loadingYearly && styles.planButtonDisabled]}
+            onPress={() => handlePurchase('yearly')}
+            disabled={loadingYearly || plan === 'pro'}
+          >
+            {loadingYearly ? (
+              <ActivityIndicator color={theme.colors.background} />
+            ) : (
+              <Text style={styles.planButtonText}>
+                {plan === 'pro' ? 'Current Plan' : 'Subscribe'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -149,6 +202,9 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.background,
     fontWeight: '600',
+  },
+  planButtonDisabled: {
+    opacity: 0.5,
   },
   features: {
     marginBottom: theme.spacing.xl,

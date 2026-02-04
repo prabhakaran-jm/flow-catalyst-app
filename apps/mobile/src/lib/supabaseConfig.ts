@@ -1,25 +1,35 @@
 /**
  * Supabase Configuration
- * 
- * This is a placeholder file. In production, you should:
- * 1. Use environment variables (via expo-constants or react-native-config)
- * 2. Or use Expo's Constants.expoConfig.extra for build-time config
- * 
- * For now, you can:
- * - Copy src/env.example.ts to src/env.ts and import from there
- * - Or update this file directly with your Supabase credentials
- * - Or use EXPO_PUBLIC_ environment variables
+ *
+ * For local Supabase: Android emulator cannot reach 127.0.0.1 (it refers to the emulator itself).
+ * Use 10.0.2.2 to reach the host machine's localhost from Android emulator.
  */
+import { Platform } from 'react-native';
+import { env } from '../env';
 
-// Option 1: Use environment variables (recommended for Expo)
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+function getSupabaseUrl(): string {
+  const url = env.SUPABASE_URL;
+  // Android emulator needs 10.0.2.2 to reach host's localhost
+  if (Platform.OS === 'android' && url.includes('127.0.0.1')) {
+    return url.replace('127.0.0.1', '10.0.2.2');
+  }
+  return url;
+}
 
-// Option 2: Import from env.ts if you create it from env.example.ts
-// import { env } from '../env';
+function getEdgeFunctionBaseUrl(): string {
+  const url = env.EDGE_FUNCTION_BASE_URL;
+  if (Platform.OS === 'android' && url.includes('127.0.0.1')) {
+    return url.replace('127.0.0.1', '10.0.2.2');
+  }
+  return url;
+}
 
 export const supabaseConfig = {
-  url: SUPABASE_URL,
-  anonKey: SUPABASE_ANON_KEY,
-  // Or use: url: env.SUPABASE_URL, anonKey: env.SUPABASE_ANON_KEY,
+  get url() {
+    return getSupabaseUrl();
+  },
+  anonKey: env.SUPABASE_ANON_KEY,
+  get edgeFunctionBaseUrl() {
+    return getEdgeFunctionBaseUrl();
+  },
 };
