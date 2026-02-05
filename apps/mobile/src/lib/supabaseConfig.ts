@@ -5,10 +5,29 @@
  * Use 10.0.2.2 to reach the host machine's localhost from Android emulator.
  */
 import { Platform } from 'react-native';
-import { env } from '../env';
+import Constants from 'expo-constants';
+
+// Get env values from env.ts (local) or Expo Constants (EAS build)
+function getEnvValue(key: string): string {
+  try {
+    // Try to import env.ts (works locally)
+    const { env } = require('../env');
+    return env[key as keyof typeof env] || '';
+  } catch {
+    // Fallback to Expo Constants (works in EAS builds)
+    const extra = Constants.expoConfig?.extra || {};
+    // Map env keys to app.json extra keys
+    const keyMap: Record<string, string> = {
+      SUPABASE_URL: 'supabaseUrl',
+      SUPABASE_ANON_KEY: 'supabaseAnonKey',
+      EDGE_FUNCTION_BASE_URL: 'edgeFunctionBaseUrl',
+    };
+    return extra[keyMap[key] || key] || '';
+  }
+}
 
 function getSupabaseUrl(): string {
-  const url = env.SUPABASE_URL;
+  const url = getEnvValue('SUPABASE_URL');
   // Android emulator needs 10.0.2.2 to reach host's localhost
   if (Platform.OS === 'android' && url.includes('127.0.0.1')) {
     return url.replace('127.0.0.1', '10.0.2.2');
@@ -17,7 +36,7 @@ function getSupabaseUrl(): string {
 }
 
 function getEdgeFunctionBaseUrl(): string {
-  const url = env.EDGE_FUNCTION_BASE_URL;
+  const url = getEnvValue('EDGE_FUNCTION_BASE_URL');
   if (Platform.OS === 'android' && url.includes('127.0.0.1')) {
     return url.replace('127.0.0.1', '10.0.2.2');
   }
@@ -28,7 +47,9 @@ export const supabaseConfig = {
   get url() {
     return getSupabaseUrl();
   },
-  anonKey: env.SUPABASE_ANON_KEY,
+  get anonKey() {
+    return getEnvValue('SUPABASE_ANON_KEY');
+  },
   get edgeFunctionBaseUrl() {
     return getEdgeFunctionBaseUrl();
   },

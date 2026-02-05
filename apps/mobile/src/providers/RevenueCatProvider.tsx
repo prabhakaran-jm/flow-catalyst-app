@@ -2,8 +2,23 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 // @ts-ignore - react-native-purchases types will be available after package installation
 import Purchases, { CustomerInfo, PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import { Platform } from 'react-native';
-import { env } from '../env';
+import Constants from 'expo-constants';
 import { useSupabase } from './SupabaseProvider';
+
+// Get RevenueCat API keys from env.ts (local) or Expo Constants (EAS build)
+function getRevenueCatApiKey(platform: 'ios' | 'android'): string | undefined {
+  try {
+    // Try to import env.ts (works locally)
+    const { env } = require('../env');
+    return platform === 'ios' ? env.REVENUECAT_API_KEY_IOS : env.REVENUECAT_API_KEY_ANDROID;
+  } catch {
+    // Fallback to Expo Constants (works in EAS builds)
+    const extra = Constants.expoConfig?.extra || {};
+    return platform === 'ios' 
+      ? extra.REVENUECAT_API_KEY_IOS 
+      : extra.REVENUECAT_API_KEY_ANDROID;
+  }
+}
 
 export type Plan = 'free' | 'pro';
 
@@ -41,9 +56,9 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     const initializeRevenueCat = async () => {
       try {
         const apiKey = Platform.select({
-          ios: env.REVENUECAT_API_KEY_IOS,
-          android: env.REVENUECAT_API_KEY_ANDROID,
-          default: env.REVENUECAT_API_KEY_ANDROID, // Fallback for web
+          ios: getRevenueCatApiKey('ios'),
+          android: getRevenueCatApiKey('android'),
+          default: getRevenueCatApiKey('android'), // Fallback for web
         });
 
         if (!apiKey || apiKey.includes('YOUR_REVENUECAT')) {

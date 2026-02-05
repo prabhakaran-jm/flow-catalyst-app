@@ -115,11 +115,12 @@ export default function SignIn() {
   const handleVerifyOtp = async () => {
     const code = otpCode.trim().replace(/\s/g, '');
     if (!code) {
-      setError('Please enter the 6-digit code from your email');
+      setError('Please enter the code from your email');
       return;
     }
-    if (code.length !== 6 || !/^\d+$/.test(code)) {
-      setError('Please enter a valid 6-digit code');
+    // Supabase may send 6 or 8 digit tokens depending on config
+    if (code.length < 6 || code.length > 10 || !/^\d+$/.test(code)) {
+      setError('Please enter the full numeric code from your email (6-10 digits)');
       return;
     }
 
@@ -129,10 +130,11 @@ export default function SignIn() {
     try {
       const { error: verifyError } = await verifyOtp(email.trim(), code);
       if (verifyError) {
-        if (verifyError.message?.toLowerCase().includes('expired') || verifyError.message?.toLowerCase().includes('invalid')) {
+        const msg = verifyError.message || verifyError.name || 'Invalid code';
+        if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid')) {
           setError('This code has expired. Please request a new magic link.');
         } else {
-          setError(verifyError.message || 'Invalid code. Please check and try again.');
+          setError(msg);
         }
       }
       // Success: onAuthStateChange will update user, useEffect will redirect to /
@@ -240,28 +242,28 @@ export default function SignIn() {
               </Text>
               <Text style={styles.emailAddress}>{email}</Text>
               <Text style={styles.emailSentHint}>
-                Click the link in your email to sign in, or enter the 6-digit code below (recommended for emulator).
+                Click the link in your email to sign in, or enter the code below (recommended for emulator).
                 {'\n\n'}
                 ⚠️ Magic links expire after 1 hour. If your link expired, click "Resend Email" below.
               </Text>
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Or enter the 6-digit code</Text>
+              <Text style={styles.label}>Or enter the code from your email</Text>
               <Text style={styles.hint}>
-                The code is in the email: "Alternatively, enter the code: XXXXXX"
+                Enter the numeric code from your email (usually 6-8 digits)
               </Text>
               <TextInput
                 style={styles.input}
-                placeholder="000000"
+                placeholder="Enter code"
                 placeholderTextColor={theme.colors.textSecondary}
                 value={otpCode}
                 onChangeText={(text) => {
-                  setOtpCode(text.replace(/\D/g, '').slice(0, 6));
+                  setOtpCode(text.replace(/\D/g, '').slice(0, 10));
                   setError(null);
                 }}
                 keyboardType="number-pad"
-                maxLength={6}
+                maxLength={10}
                 editable={!loading}
               />
             </View>
@@ -269,7 +271,7 @@ export default function SignIn() {
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleVerifyOtp}
-              disabled={loading || otpCode.length !== 6}
+              disabled={loading || otpCode.length < 6}
             >
               {loading ? (
                 <ActivityIndicator color={theme.colors.background} />

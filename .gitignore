@@ -63,6 +63,10 @@ web-build/
 *.orig.*
 expo-env.d.ts
 
+# Native directories (managed workflow - let EAS generate these)
+apps/mobile/android/
+apps/mobile/ios/
+
 # React Native
 *.orig.*
 *.jks

@@ -148,8 +148,17 @@ supabase db reset
 
 1. Link your project: `supabase link --project-ref your-project-ref`
 2. Push migrations: `supabase db push`
-3. Deploy functions: `supabase functions deploy run-catalyst`
-4. Deploy functions: `supabase functions deploy create-catalyst`
+3. Deploy functions (requires Docker Desktop running):
+   ```bash
+   supabase functions deploy run-catalyst
+   supabase functions deploy create-catalyst
+   ```
+   
+   **If Docker isn't available**, use the API method:
+   ```bash
+   supabase functions deploy run-catalyst --use-api
+   supabase functions deploy create-catalyst --use-api
+   ```
 
 ### Expo
 
