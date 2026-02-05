@@ -127,6 +127,10 @@ curl -X POST http://localhost:54321/functions/v1/run-catalyst \
   -d '{"catalyst_id": "uuid", "inputs": {}}'
 ```
 
+**504 Timeout:** If Run Catalyst hangs and returns "upstream server is timing out", Kong's proxy times out before the AI responds. Add `GEMINI_MAX_TOKENS=500` (or lower) to `.env` to speed up responses.
+
+**429 Rate Limit (Gemini):** Free tier Gemini API keys have rate limits (~15 requests/minute). If you see "rate limit exceeded", wait 1-2 minutes between requests or upgrade your API key at https://aistudio.google.com/apikey
+
 ## Database Schema
 
 Key tables:

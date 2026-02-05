@@ -286,7 +286,21 @@ export default function CatalystDetail() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Output</Text>
           <View style={styles.outputContainer}>
-            <Markdown style={markdownStyles}>{output}</Markdown>
+            <Markdown 
+              style={markdownStyles}
+              debugPrintTree={false}
+            >
+              {output ? (() => {
+                // Preprocess markdown to ensure headings are properly formatted
+                // 1. Ensure headings start on a new line (if not already)
+                let processed = output.replace(/([^\n\r])##/g, '$1\n##');
+                // 2. Ensure space after ## if missing (e.g., "##1." -> "## 1.")
+                processed = processed.replace(/##([^\s#\n])/g, '## $1');
+                // 3. Normalize multiple newlines to max 2
+                processed = processed.replace(/\n{3,}/g, '\n\n');
+                return processed;
+              })() : ''}
+            </Markdown>
           </View>
         </View>
       )}

@@ -100,7 +100,8 @@ export async function runCatalyst({
       (errorData.error || `Failed to run catalyst: ${response.statusText}`) +
         details +
         hint +
-        badGatewayHint
+        badGatewayHint +
+        timeoutHint
     );
   }
 

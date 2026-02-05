@@ -64,7 +64,8 @@ async function callAI(prompt: string): Promise<string> {
  */
 async function callOpenAI(prompt: string, apiKey: string): Promise<string> {
   const model = Deno.env.get('OPENAI_MODEL') || 'gpt-4o-mini';
-  const maxTokens = parseInt(Deno.env.get('OPENAI_MAX_TOKENS') || '1000');
+  // Default 500 to avoid Kong upstream timeout (~60s) on local dev
+  const maxTokens = parseInt(Deno.env.get('OPENAI_MAX_TOKENS') || '500');
   const temperature = parseFloat(Deno.env.get('OPENAI_TEMPERATURE') || '0.7');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -164,7 +165,8 @@ async function callOpenRouter(prompt: string, apiKey?: string): Promise<string> 
  */
 async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
   const model = Deno.env.get('ANTHROPIC_MODEL') || 'claude-3-5-sonnet-20241022';
-  const maxTokens = parseInt(Deno.env.get('ANTHROPIC_MAX_TOKENS') || '1000');
+  // Default 500 to avoid Kong upstream timeout (~60s) on local dev
+  const maxTokens = parseInt(Deno.env.get('ANTHROPIC_MAX_TOKENS') || '500');
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -207,7 +209,8 @@ async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
  */
 async function callGemini(prompt: string, apiKey: string): Promise<string> {
   const model = Deno.env.get('GEMINI_MODEL') || 'gemini-2.0-flash';
-  const maxTokens = parseInt(Deno.env.get('GEMINI_MAX_TOKENS') || '1000');
+  // Default 500 to avoid Kong upstream timeout (~60s) on local dev; increase in .env if needed
+  const maxTokens = parseInt(Deno.env.get('GEMINI_MAX_TOKENS') || '500');
   const temperature = parseFloat(Deno.env.get('GEMINI_TEMPERATURE') || '0.7');
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -228,9 +231,32 @@ async function callGemini(prompt: string, apiKey: string): Promise<string> {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[run-catalyst] Gemini API error:', errorText);
-    throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+    let errorMessage = `Gemini API error: ${response.status} ${response.statusText}`;
+    
+    // Try to parse error details from response
+    try {
+      const errorData = await response.json();
+      const errorDetails = errorData.error;
+      
+      if (response.status === 429) {
+        // Rate limit exceeded
+        const quotaInfo = errorDetails?.message || 'Rate limit exceeded';
+        errorMessage = `Gemini API rate limit exceeded (429). ${quotaInfo}. Free tier limits: ~15 requests/minute. Wait a minute and try again, or upgrade your API key at https://aistudio.google.com/apikey`;
+      } else if (errorDetails?.message) {
+        errorMessage = `Gemini API error: ${errorDetails.message}`;
+      }
+      
+      console.error('[run-catalyst] Gemini API error details:', JSON.stringify(errorData, null, 2));
+    } catch (parseError) {
+      // If JSON parsing fails, use text response
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('[run-catalyst] Gemini API error (text):', errorText);
+      if (response.status === 429) {
+        errorMessage = `Gemini API rate limit exceeded (429). Free tier limits: ~15 requests/minute. Wait a minute and try again.`;
+      }
+    }
+    
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();
@@ -433,7 +459,7 @@ serve(async (req) => {
     }
 
     // Mobile-friendly output instructions
-    prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear ## headings, and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis, - for bullets. Be scannable.]`;
+    prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis, - for bullets. Ensure headings start with ## on a new line with a space after ##. Be scannable.]`;
 
     // Build debug string for troubleshooting
     const promptDebug = [
