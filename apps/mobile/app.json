@@ -17,7 +17,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.flowcatalyst.app"
+      "bundleIdentifier": "com.flowcatalyst.app",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -31,14 +32,31 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.25"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "supabaseUrl": "YOUR_SUPABASE_URL",
-      "supabaseAnonKey": "YOUR_SUPABASE_ANON_KEY"
+      "supabaseAnonKey": "YOUR_SUPABASE_ANON_KEY",
+      "edgeFunctionBaseUrl": "YOUR_EDGE_FUNCTION_BASE_URL",
+      "REVENUECAT_API_KEY_IOS": "YOUR_REVENUECAT_IOS_API_KEY",
+      "REVENUECAT_API_KEY_ANDROID": "YOUR_REVENUECAT_ANDROID_API_KEY",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "1ab86178-046a-4e57-9bd7-94505216d86c"
+      }
     }
   }
 }
