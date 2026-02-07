@@ -31,6 +31,14 @@ export const env = {
   EDGE_FUNCTION_BASE_URL: 'YOUR_EDGE_FUNCTION_BASE_URL_HERE',
 
   /**
+   * Web URL for magic link redirect (required for Android).
+   * Android strips hash fragments from deep links, so tokens in #access_token=... are lost.
+   * Set this to your deployed web app URL (e.g. https://yourapp.vercel.app).
+   * The magic link will open this URL first; the page redirects to the app with query params.
+   */
+  AUTH_REDIRECT_WEB_URL: 'YOUR_WEB_APP_URL_HERE',
+
+  /**
    * RevenueCat API Key
    * Get this from RevenueCat Dashboard > Project Settings > API Keys
    * Use different keys for iOS and Android

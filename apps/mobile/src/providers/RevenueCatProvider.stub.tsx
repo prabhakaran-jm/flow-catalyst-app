@@ -6,6 +6,7 @@ interface RevenueCatContextType {
   plan: Plan;
   refreshEntitlements: () => Promise<void>;
   purchasePro: () => Promise<void>;
+  restorePurchases: () => Promise<void>;
   setPlanForTesting?: (plan: Plan) => void;
 }
 
@@ -35,6 +36,10 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     );
   };
 
+  const restorePurchases = async (): Promise<void> => {
+    throw new Error('Restore is only available in the store version.');
+  };
+
   // Allow plan switching in stub (preview builds) so testers can try Pro features without real purchase
   const setPlanForTesting = (newPlan: Plan) => {
     setPlan(newPlan);
@@ -44,6 +49,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     plan,
     refreshEntitlements,
     purchasePro,
+    restorePurchases,
     setPlanForTesting,
   };
 

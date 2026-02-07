@@ -90,7 +90,6 @@ export async function runCatalyst({
     });
     const details = errorData.details ? ` (${errorData.details})` : '';
     const hint = errorData.hint ? ` - ${errorData.hint}` : '';
-    // 502 usually means Supabase/Kong couldn't reach the Edge Function
     const badGatewayHint =
       response.status === 502
         ? ' Ensure both "supabase start" and "supabase functions serve" are running (see LOCAL_SUPABASE_SETUP.md).'
@@ -100,14 +99,44 @@ export async function runCatalyst({
       (errorData.error || `Failed to run catalyst: ${response.statusText}`) +
         details +
         hint +
-        badGatewayHint +
-        timeoutHint
+        badGatewayHint
     );
   }
 
   const result = await response.json();
   console.log('Catalyst run successfully:', { output: result.output?.substring(0, 100) + '...' });
   return result;
+}
+
+/**
+ * Run a built-in coach (no auth required for anonymous users)
+ */
+export async function runBuiltInCoach({
+  builtInId,
+  promptTemplate,
+  inputs,
+}: {
+  builtInId: string;
+  promptTemplate: string;
+  inputs: Record<string, any>;
+}): Promise<{ output: string; promptDebug: string }> {
+  const baseUrl = getEdgeFunctionBaseUrl();
+
+  const response = await fetch(`${baseUrl}/run-catalyst`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      built_in: { id: builtInId, prompt_template: promptTemplate },
+      inputs,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    throw new Error(errorData.error || `Failed to run coach: ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
 /**
@@ -363,5 +392,100 @@ export async function deleteCatalyst(catalystId: string): Promise<void> {
 
   if (!data || data.length === 0) {
     throw new Error('Catalyst not found or you do not have permission to delete it');
+  }
+}
+
+/**
+ * Saved run type (Save to library)
+ */
+export interface SavedRun {
+  id: string;
+  user_id: string;
+  coach_name: string;
+  coach_id: string;
+  output: string;
+  inputs: Record<string, unknown>;
+  created_at: string;
+}
+
+/**
+ * Save a run to the user's library
+ */
+export async function saveRun(payload: {
+  coachName: string;
+  coachId: string;
+  output: string;
+  inputs: Record<string, unknown>;
+}): Promise<SavedRun> {
+  const {
+    data: { user },
+    error: sessionError,
+  } = await supabaseClient.auth.getUser();
+
+  if (sessionError || !user) {
+    throw new Error('Not authenticated');
+  }
+
+  const { data, error } = await supabaseClient
+    .from('saved_runs')
+    .insert({
+      user_id: user.id,
+      coach_name: payload.coachName,
+      coach_id: payload.coachId,
+      output: payload.output,
+      inputs: payload.inputs || {},
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error saving run:', error);
+    throw new Error(`Failed to save: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Fetch a single saved run by ID
+ */
+export async function fetchSavedRun(id: string): Promise<SavedRun> {
+  const { data, error } = await supabaseClient.from('saved_runs').select('*').eq('id', id).single();
+
+  if (error) {
+    console.error('Error fetching saved run:', error);
+    throw new Error(`Failed to load: ${error.message}`);
+  }
+
+  if (!data) throw new Error('Saved run not found');
+  return data;
+}
+
+/**
+ * Fetch the current user's saved runs
+ */
+export async function fetchSavedRuns(): Promise<SavedRun[]> {
+  const { data, error } = await supabaseClient
+    .from('saved_runs')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching saved runs:', error);
+    throw new Error(`Failed to load saved runs: ${error.message}`);
+  }
+
+  return data || [];
+}
+
+/**
+ * Delete a saved run
+ */
+export async function deleteSavedRun(id: string): Promise<void> {
+  const { error } = await supabaseClient.from('saved_runs').delete().eq('id', id);
+
+  if (error) {
+    console.error('Error deleting saved run:', error);
+    throw new Error(`Failed to delete: ${error.message}`);
   }
 }

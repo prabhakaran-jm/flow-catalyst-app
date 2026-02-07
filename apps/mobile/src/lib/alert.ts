@@ -13,6 +13,31 @@ export function showAlert(title: string, message: string, onOk?: () => void): vo
 }
 
 /**
+ * Alert with two actions. onPrimary is for the main action, onSecondary for the other.
+ */
+export function showAlertWithActions(
+  title: string,
+  message: string,
+  primaryLabel: string,
+  secondaryLabel: string,
+  onPrimary: () => void,
+  onSecondary?: () => void
+): void {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    if (window.confirm(`${title}\n\n${message}\n\nClick OK for "${primaryLabel}"`)) {
+      onPrimary();
+    } else {
+      onSecondary?.();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: secondaryLabel, style: 'cancel', onPress: onSecondary },
+      { text: primaryLabel, onPress: onPrimary },
+    ]);
+  }
+}
+
+/**
  * Cross-platform confirm dialog. Returns a promise that resolves to true if confirmed.
  */
 export function showConfirm(

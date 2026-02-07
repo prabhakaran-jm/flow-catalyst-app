@@ -42,10 +42,13 @@ module.exports = {
       ...base.expo.extra,
       // Skip RevenueCat on preview/internal builds - SDK can crash when app is sideloaded (not from Play Store)
       skipRevenueCat: process.env.EAS_BUILD_PROFILE === 'preview' || process.env.EAS_BUILD_PROFILE === 'development',
+      // Show Test Navigation (Set Pro/Set Free) in dev, preview, or when explicitly enabled
+      showTestNav: process.env.EAS_BUILD_PROFILE === 'preview' || process.env.EAS_BUILD_PROFILE === 'development' || process.env.EXPO_PUBLIC_SHOW_TEST_NAV === 'true',
       // Inject EAS env vars at build time (fallback to placeholders for local dev)
       supabaseUrl: process.env.SUPABASE_URL || base.expo.extra.supabaseUrl,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY || base.expo.extra.supabaseAnonKey,
       edgeFunctionBaseUrl: process.env.EDGE_FUNCTION_BASE_URL || base.expo.extra.edgeFunctionBaseUrl,
+      authRedirectWebUrl: process.env.AUTH_REDIRECT_WEB_URL || base.expo.extra.authRedirectWebUrl,
       REVENUECAT_API_KEY_IOS: process.env.REVENUECAT_API_KEY_IOS || base.expo.extra.REVENUECAT_API_KEY_IOS,
       REVENUECAT_API_KEY_ANDROID: process.env.REVENUECAT_API_KEY_ANDROID || base.expo.extra.REVENUECAT_API_KEY_ANDROID,
     },

@@ -1,8 +1,22 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Vibration,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import Constants from 'expo-constants';
 import { theme } from '@/theme';
+import MagicWandButton from '@/src/components/MagicWandButton';
 import { createCatalyst } from '@/src/lib/api';
+import { getRealAISuggestion } from '@/utils/ai-service';
 import { showAlert } from '@/src/lib/alert';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
@@ -12,19 +26,18 @@ export default function CreateCatalyst() {
   const { loading: authLoading, user } = useSupabase();
   const { plan } = useRevenueCat();
 
-  // Redirect to sign-in if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
       router.replace('/signin');
     }
   }, [user, authLoading, router]);
 
-  // Redirect free users to paywall
+  const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
   useEffect(() => {
-    if (!authLoading && user && plan === 'free') {
+    if (!authLoading && user && plan === 'free' && !skipRevenueCat) {
       router.replace('/paywall');
     }
-  }, [plan, authLoading, user, router]);
+  }, [plan, authLoading, user, router, skipRevenueCat]);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -32,12 +45,54 @@ export default function CreateCatalyst() {
   const [promptTemplate, setPromptTemplate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isRefining, setIsRefining] = useState<string | null>(null);
+
+  const handleMagicWandPress = useCallback(
+    async (field: 'name' | 'description' | 'inputsJson' | 'promptTemplate', fieldType?: 'advice' | 'context') => {
+      if (Platform.OS !== 'web') Vibration.vibrate(10);
+      setIsRefining(field);
+
+      if (fieldType === 'advice' || fieldType === 'context') {
+        const currentText =
+          field === 'name'
+            ? name
+            : field === 'description'
+              ? description
+              : field === 'inputsJson'
+                ? inputsJson
+                : promptTemplate;
+        try {
+          const newText = await getRealAISuggestion(fieldType, currentText.trim());
+          if (field === 'name') setName(newText);
+          else if (field === 'description') setDescription(newText);
+        } catch (err) {
+          console.error('AI Magic Wand failed:', err);
+          showAlert('Refinement failed', err instanceof Error ? err.message : 'Please try again');
+        } finally {
+          setIsRefining(null);
+        }
+      } else {
+        const CREATE_AI_SUGGESTIONS: Record<string, string> = {
+          inputsJson: '[{"name": "topic", "type": "string"}, {"name": "audience", "type": "string"}]',
+          promptTemplate: 'You are a writing coach. Help create a compelling hook for: {topic}. Audience: {audience}.',
+        };
+        const suggestion = CREATE_AI_SUGGESTIONS[field] ?? '';
+        if (field === 'inputsJson') setInputsJson((prev) => (prev.trim() ? `${prev}\n${suggestion}` : suggestion));
+        else if (field === 'promptTemplate') setPromptTemplate((prev) => (prev.trim() ? `${prev}\n${suggestion}` : suggestion));
+        setIsRefining(null);
+      }
+    },
+    [name, description, inputsJson, promptTemplate]
+  );
 
   const handleSave = async () => {
-    // Double-check plan (shouldn't reach here for free users, but safety check)
-    if (plan === 'free') {
+    if (plan === 'free' && !skipRevenueCat) {
       router.push('/paywall');
       return;
+    }
+
+    if (Platform.OS !== 'web') {
+      Vibration.vibrate(10);
     }
 
     if (!name.trim() || !promptTemplate.trim()) {
@@ -63,20 +118,15 @@ export default function CreateCatalyst() {
     setError(null);
 
     try {
-      console.log('Creating catalyst...');
       const catalyst = await createCatalyst({
         name: name.trim(),
         description: description.trim() || undefined,
         inputs_json: parsedInputs,
         prompt_template: promptTemplate.trim(),
       });
-
-      console.log('Catalyst created:', catalyst);
-      showAlert('Success', 'Catalyst created successfully!', () => router.back());
+      showAlert('Success', 'Coach created successfully!', () => router.back());
     } catch (err) {
-      console.error('Error creating catalyst:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to create catalyst';
-      console.error('Error message:', errorMessage);
       setError(errorMessage);
       showAlert('Error', errorMessage);
     } finally {
@@ -84,7 +134,7 @@ export default function CreateCatalyst() {
     }
   };
 
-  if (authLoading || plan === 'free') {
+  if (authLoading || (plan === 'free' && !skipRevenueCat)) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
@@ -93,88 +143,136 @@ export default function CreateCatalyst() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.form}>
-        <View style={styles.field}>
-          <Text style={styles.label}>Name *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter catalyst name"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={name}
-            onChangeText={(text) => {
-              setName(text);
-              setError(null);
-            }}
-          />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+    >
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        <View style={styles.progressStepper}>
+          <View style={styles.progressDot} />
+          <View style={[styles.progressDot, styles.progressDotActive]} />
+          <View style={styles.progressDot} />
         </View>
 
-        <View style={styles.field}>
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Describe what this catalyst does"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Inputs JSON (Array)</Text>
-          <Text style={styles.hint}>
-            Example: {`[{"name": "task", "type": "string"}]`}
-          </Text>
-          <TextInput
-            style={[styles.input, styles.textArea, styles.codeInput]}
-            placeholder='[{"name": "input1", "type": "string"}]'
-            placeholderTextColor={theme.colors.textSecondary}
-            value={inputsJson}
-            onChangeText={(text) => {
-              setInputsJson(text);
-              setError(null);
-            }}
-            multiline
-            numberOfLines={6}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Prompt Template *</Text>
-          <Text style={styles.hint}>
-            Use {`{inputs}`} to reference inputs in your template
-          </Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Enter the prompt template for this catalyst"
-            placeholderTextColor={theme.colors.textSecondary}
-            value={promptTemplate}
-            onChangeText={(text) => {
-              setPromptTemplate(text);
-              setError(null);
-            }}
-            multiline
-            numberOfLines={8}
-          />
-        </View>
-
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.form}>
+          <View style={styles.field}>
+            <Text style={styles.label}>Name *</Text>
+            <View style={styles.inputWithIcon}>
+              <TextInput
+                style={[styles.input, styles.inputSingle]}
+                placeholder="Enter coach name"
+                placeholderTextColor={theme.colors.textSecondary}
+                value={name}
+                onChangeText={(text) => {
+                  setName(text);
+                  setError(null);
+                }}
+                editable={!isRefining}
+              />
+              <MagicWandButton
+                onPress={() => handleMagicWandPress('name', 'advice')}
+                loading={isRefining === 'name'}
+              />
+            </View>
           </View>
-        )}
-      </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => router.back()}
-          disabled={loading}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
+          <View style={styles.field}>
+            <Text style={styles.label}>Description</Text>
+            <View style={styles.inputWithIcon}>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Describe what this coach does"
+                placeholderTextColor={theme.colors.textSecondary}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                numberOfLines={3}
+                editable={!isRefining}
+              />
+              <MagicWandButton
+                onPress={() => handleMagicWandPress('description', 'context')}
+                loading={isRefining === 'description'}
+              />
+            </View>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Inputs JSON (Array)</Text>
+            <Text style={styles.hint}>
+              Example: {`[{"name": "task", "type": "string"}]`}
+            </Text>
+            <View style={styles.inputWithIcon}>
+              <TextInput
+                style={[styles.input, styles.textArea, styles.codeInput]}
+                placeholder='[{"name": "input1", "type": "string"}]'
+                placeholderTextColor={theme.colors.textSecondary}
+                value={inputsJson}
+                onChangeText={(text) => {
+                  setInputsJson(text);
+                  setError(null);
+                }}
+                multiline
+                numberOfLines={6}
+                editable={!isRefining}
+              />
+              <MagicWandButton
+                onPress={() => handleMagicWandPress('inputsJson')}
+                loading={isRefining === 'inputsJson'}
+              />
+            </View>
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Prompt Template *</Text>
+            <Text style={styles.hint}>
+              Use {`{inputs}`} to reference inputs in your template
+            </Text>
+            <View style={styles.inputWithIcon}>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Enter the prompt template for this coach"
+                placeholderTextColor={theme.colors.textSecondary}
+                value={promptTemplate}
+                onChangeText={(text) => {
+                  setPromptTemplate(text);
+                  setError(null);
+                }}
+                multiline
+                numberOfLines={8}
+                editable={!isRefining}
+              />
+              <MagicWandButton
+                onPress={() => handleMagicWandPress('promptTemplate')}
+                loading={isRefining === 'promptTemplate'}
+              />
+            </View>
+          </View>
+
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.cancelRow}>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => router.back()}
+            disabled={loading}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <View style={styles.saveButtonContainer}>
         <TouchableOpacity
           style={[styles.saveButton, loading && styles.saveButtonDisabled]}
           onPress={handleSave}
@@ -183,11 +281,11 @@ export default function CreateCatalyst() {
           {loading ? (
             <ActivityIndicator color={theme.colors.background} />
           ) : (
-            <Text style={styles.saveButtonText}>Create</Text>
+            <Text style={styles.saveButtonText}>Save Coach</Text>
           )}
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -196,8 +294,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  content: {
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: theme.spacing.md,
+    paddingBottom: theme.spacing.xl,
+  },
+  progressStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+  },
+  progressDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.border,
+  },
+  progressDotActive: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.accent,
   },
   form: {
     marginBottom: theme.spacing.lg,
@@ -217,15 +338,20 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
     fontStyle: 'italic',
   },
+  inputWithIcon: {
+    position: 'relative',
+  },
   input: {
     ...theme.typography.body,
     backgroundColor: theme.colors.background,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
+    borderColor: '#E5E7EB',
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
+    paddingRight: 48,
     color: theme.colors.text,
   },
+  inputSingle: {},
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
@@ -238,7 +364,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
     borderWidth: 1,
     borderColor: theme.colors.error,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     marginTop: theme.spacing.md,
   },
@@ -246,28 +372,28 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.error,
   },
-  actions: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
+  cancelRow: {
+    marginBottom: theme.spacing.md,
   },
   cancelButton: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
     padding: theme.spacing.md,
     alignItems: 'center',
   },
   cancelButtonText: {
     ...theme.typography.body,
-    color: theme.colors.text,
+    color: theme.colors.textSecondary,
     fontWeight: '600',
   },
+  saveButtonContainer: {
+    padding: theme.spacing.md,
+    paddingBottom: theme.spacing.xl,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
   saveButton: {
-    flex: 1,
     backgroundColor: theme.colors.accent,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     alignItems: 'center',
   },

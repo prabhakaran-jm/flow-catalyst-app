@@ -145,3 +145,6 @@ verify_jwt = false
 
 [functions.run-catalyst]
 verify_jwt = false
+
+[functions.refine]
+verify_jwt = false

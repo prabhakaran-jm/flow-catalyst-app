@@ -1,6 +1,7 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
+import Constants from 'expo-constants';
 import { theme } from '@/theme';
 import { fetchCatalyst, updateCatalyst, Catalyst } from '@/src/lib/api';
 import { showAlert } from '@/src/lib/alert';
@@ -28,11 +29,12 @@ export default function EditCatalyst() {
     }
   }, [user, authLoading, router]);
 
+  const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
   useEffect(() => {
-    if (!authLoading && user && plan === 'free') {
+    if (!authLoading && user && plan === 'free' && !skipRevenueCat) {
       router.replace('/paywall');
     }
-  }, [plan, authLoading, user, router]);
+  }, [plan, authLoading, user, router, skipRevenueCat]);
 
   useEffect(() => {
     const load = async () => {
@@ -91,7 +93,7 @@ export default function EditCatalyst() {
         prompt_template: promptTemplate.trim(),
       });
 
-      showAlert('Success', 'Catalyst updated successfully!', () => {
+      showAlert('Success', 'Coach updated successfully!', () => {
         router.replace(`/catalyst/${id}`);
       });
     } catch (err) {
@@ -103,7 +105,7 @@ export default function EditCatalyst() {
     }
   };
 
-  if (authLoading || loadingCatalyst || plan === 'free') {
+  if (authLoading || loadingCatalyst || (plan === 'free' && !skipRevenueCat)) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
@@ -115,7 +117,7 @@ export default function EditCatalyst() {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error || 'Catalyst not found'}</Text>
+          <Text style={styles.errorText}>{error || 'Coach not found'}</Text>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
@@ -125,13 +127,23 @@ export default function EditCatalyst() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+    >
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
       <View style={styles.form}>
         <View style={styles.field}>
           <Text style={styles.label}>Name *</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter catalyst name"
+            placeholder="Enter coach name"
             placeholderTextColor={theme.colors.textSecondary}
             value={name}
             onChangeText={(text) => {
@@ -145,7 +157,7 @@ export default function EditCatalyst() {
           <Text style={styles.label}>Description</Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder="Describe what this catalyst does"
+            placeholder="Describe what this coach does"
             placeholderTextColor={theme.colors.textSecondary}
             value={description}
             onChangeText={setDescription}
@@ -180,7 +192,7 @@ export default function EditCatalyst() {
           </Text>
           <TextInput
             style={[styles.input, styles.textArea]}
-            placeholder="Enter the prompt template for this catalyst"
+            placeholder="Enter the prompt template for this coach"
             placeholderTextColor={theme.colors.textSecondary}
             value={promptTemplate}
             onChangeText={(text) => {
@@ -220,6 +232,7 @@ export default function EditCatalyst() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -228,8 +241,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  scrollView: {
+    flex: 1,
+  },
   content: {
     padding: theme.spacing.md,
+    paddingBottom: theme.spacing.xl * 2,
   },
   form: {
     marginBottom: theme.spacing.lg,

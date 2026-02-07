@@ -1,30 +1,38 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { Link, useRouter } from 'expo-router';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  Platform,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { theme } from '@/theme';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
+const FEATURES = [
+  'All 5 coaches',
+  'Unlimited runs',
+  'AI Magic Wand refinement',
+  'Save to library',
+  'Create custom coaches',
+];
+
 export default function Paywall() {
   const router = useRouter();
-  const { purchasePro, plan } = useRevenueCat();
-  const [loadingMonthly, setLoadingMonthly] = useState(false);
-  const [loadingYearly, setLoadingYearly] = useState(false);
+  const { purchasePro, restorePurchases, plan } = useRevenueCat();
+  const [loadingStart, setLoadingStart] = useState(false);
+  const [loadingRestore, setLoadingRestore] = useState(false);
 
-  const handlePurchase = async (period: 'monthly' | 'yearly') => {
+  const handleStartPro = async () => {
     try {
-      if (period === 'monthly') {
-        setLoadingMonthly(true);
-      } else {
-        setLoadingYearly(true);
-      }
-
+      setLoadingStart(true);
       await purchasePro();
-      
       Alert.alert('Success', 'Subscription activated!', [
-        {
-          text: 'OK',
-          onPress: () => router.back(),
-        },
+        { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
       console.error('Purchase error:', error);
@@ -37,82 +45,70 @@ export default function Paywall() {
           : msg
       );
     } finally {
-      setLoadingMonthly(false);
-      setLoadingYearly(false);
+      setLoadingStart(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    try {
+      setLoadingRestore(true);
+      await restorePurchases();
+      Alert.alert('Success', 'Purchase restored!', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      Alert.alert('Restore Failed', 'No active subscription found.');
+    } finally {
+      setLoadingRestore(false);
     }
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>Upgrade to Premium</Text>
+        <Text style={styles.title}>Go Pro</Text>
         <Text style={styles.subtitle}>
-          Unlock unlimited catalysts and advanced features
+          Build momentum without limits.
         </Text>
       </View>
 
-      <View style={styles.plans}>
-        <View style={styles.planCard}>
-          <Text style={styles.planName}>Monthly</Text>
-          <Text style={styles.planPrice}>$9.99</Text>
-          <Text style={styles.planPeriod}>per month</Text>
-          <TouchableOpacity 
-            style={[styles.planButton, loadingMonthly && styles.planButtonDisabled]}
-            onPress={() => handlePurchase('monthly')}
-            disabled={loadingMonthly || plan === 'pro'}
-          >
-            {loadingMonthly ? (
-              <ActivityIndicator color={theme.colors.background} />
-            ) : (
-              <Text style={styles.planButtonText}>
-                {plan === 'pro' ? 'Current Plan' : 'Subscribe'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={[styles.planCard, styles.planCardFeatured]}>
-          <Text style={styles.badge}>Best Value</Text>
-          <Text style={styles.planName}>Yearly</Text>
-          <Text style={styles.planPrice}>$79.99</Text>
-          <Text style={styles.planPeriod}>per year</Text>
-          <Text style={styles.savings}>Save 33%</Text>
-          <TouchableOpacity 
-            style={[styles.planButtonFeatured, loadingYearly && styles.planButtonDisabled]}
-            onPress={() => handlePurchase('yearly')}
-            disabled={loadingYearly || plan === 'pro'}
-          >
-            {loadingYearly ? (
-              <ActivityIndicator color={theme.colors.background} />
-            ) : (
-              <Text style={styles.planButtonText}>
-                {plan === 'pro' ? 'Current Plan' : 'Subscribe'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <View style={styles.features}>
-        <Text style={styles.featuresTitle}>What's included:</Text>
-        <View style={styles.featureItem}>
-          <Text style={styles.featureText}>✓ Unlimited Action Catalysts</Text>
-        </View>
-        <View style={styles.featureItem}>
-          <Text style={styles.featureText}>✓ AI-powered suggestions</Text>
-        </View>
-        <View style={styles.featureItem}>
-          <Text style={styles.featureText}>✓ Advanced analytics</Text>
-        </View>
-        <View style={styles.featureItem}>
-          <Text style={styles.featureText}>✓ Priority support</Text>
-        </View>
+        {FEATURES.map((feature, index) => (
+          <View key={index} style={styles.featureCard}>
+            <Text style={styles.featureText}>✓ {feature}</Text>
+          </View>
+        ))}
       </View>
 
       <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.back()}
+        style={[styles.primaryButton, loadingStart && styles.buttonDisabled]}
+        onPress={handleStartPro}
+        disabled={loadingStart || plan === 'pro'}
       >
+        {loadingStart ? (
+          <ActivityIndicator color={theme.colors.background} />
+        ) : (
+          <Text style={styles.primaryButtonText}>
+            {plan === 'pro' ? 'Current Plan' : 'Unlock Pro'}
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.secondaryButton, loadingRestore && styles.buttonDisabled]}
+        onPress={handleRestore}
+        disabled={loadingRestore || plan === 'pro'}
+      >
+        {loadingRestore ? (
+          <ActivityIndicator color={theme.colors.accent} size="small" />
+        ) : (
+          <Text style={styles.secondaryButtonText}>Restore purchase</Text>
+        )}
+      </TouchableOpacity>
+
+      <Text style={styles.footer}>Cancel anytime.</Text>
+
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Text style={styles.backButtonText}>Maybe Later</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -126,6 +122,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: theme.spacing.md,
+    paddingBottom: theme.spacing.xxl,
   },
   header: {
     marginBottom: theme.spacing.xl,
@@ -142,91 +139,61 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     textAlign: 'center',
   },
-  plans: {
+  features: {
     gap: theme.spacing.md,
     marginBottom: theme.spacing.xl,
   },
-  planCard: {
-    backgroundColor: theme.colors.background,
+  featureCard: {
+    backgroundColor: theme.colors.accentLightBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
-    alignItems: 'center',
-    position: 'relative',
-  },
-  planCardFeatured: {
-    borderColor: theme.colors.accent,
-    borderWidth: 2,
-  },
-  badge: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.accent,
-    fontWeight: '600',
-    marginBottom: theme.spacing.sm,
-  },
-  planName: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  planPrice: {
-    ...theme.typography.h1,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  planPeriod: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.md,
-  },
-  savings: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.success,
-    fontWeight: '600',
-    marginBottom: theme.spacing.md,
-  },
-  planButton: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xl,
-    width: '100%',
-    alignItems: 'center',
-  },
-  planButtonFeatured: {
-    backgroundColor: theme.colors.accentDark,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xl,
-    width: '100%',
-    alignItems: 'center',
-  },
-  planButtonText: {
-    ...theme.typography.body,
-    color: theme.colors.background,
-    fontWeight: '600',
-  },
-  planButtonDisabled: {
-    opacity: 0.5,
-  },
-  features: {
-    marginBottom: theme.spacing.xl,
-  },
-  featuresTitle: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  featureItem: {
-    marginBottom: theme.spacing.sm,
+    padding: theme.spacing.md,
   },
   featureText: {
     ...theme.typography.body,
     color: theme.colors.text,
   },
-  backButton: {
+  primaryButton: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.lg,
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8 },
+      android: { elevation: 8 },
+    }),
+  },
+  primaryButtonText: {
+    ...theme.typography.h2,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  secondaryButton: {
     backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.accent,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  footer: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: theme.spacing.md,
+  },
+  backButton: {
+    marginTop: theme.spacing.xl,
     padding: theme.spacing.md,
     alignItems: 'center',
   },

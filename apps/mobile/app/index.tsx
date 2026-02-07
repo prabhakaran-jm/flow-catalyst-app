@@ -1,33 +1,53 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
-import { Link, useRouter, useFocusEffect } from 'expo-router';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+  TextInput,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState, useEffect } from 'react';
+import Constants from 'expo-constants';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/theme';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
 import { fetchCatalysts, deleteCatalyst, Catalyst } from '@/src/lib/api';
 import { showAlert, showConfirm } from '@/src/lib/alert';
+import { BUILT_IN_COACHES, type BuiltInCoachId } from '@/src/lib/coaches';
+
+// Coach icon colors (brand-aligned accents)
+const COACH_ICON_COLORS: Record<string, string> = {
+  hook: '#6366F1',
+  outline: '#818CF8',
+  'block-breaker': '#4F46E5',
+  clarity: '#7C3AED',
+  decision: '#6366F1',
+};
+
+function CoachIcon({ coachId }: { coachId: string }) {
+  const color = COACH_ICON_COLORS[coachId] ?? theme.colors.accent;
+  return (
+    <View style={[styles.coachIcon, { backgroundColor: color }]}>
+      <Ionicons name="sparkles" size={18} color="#FFFFFF" />
+    </View>
+  );
+}
 
 export default function Index() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { plan, setPlanForTesting } = useRevenueCat();
   const { user, loading, signOut } = useSupabase();
   const [catalysts, setCatalysts] = useState<Catalyst[]>([]);
-  const [loadingCatalysts, setLoadingCatalysts] = useState(true);
+  const [loadingCatalysts, setLoadingCatalysts] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Redirect to sign-in if not authenticated; refresh catalysts when screen gains focus
-  useFocusEffect(
-    useCallback(() => {
-      if (!loading && !user) {
-        router.replace('/signin');
-      } else if (user) {
-        // Refresh list when returning from create/edit (ensures new catalysts appear)
-        loadCatalysts();
-      }
-    }, [user, loading, router, loadCatalysts])
-  );
-
-  // Fetch catalysts when user is available
   const loadCatalysts = useCallback(async () => {
     if (!user) return;
     try {
@@ -41,14 +61,12 @@ export default function Index() {
     }
   }, [user]);
 
-  // Load catalysts on mount and when user changes
-  useEffect(() => {
-    if (user) {
-      loadCatalysts();
-    }
-  }, [user, loadCatalysts]);
+  useFocusEffect(
+    useCallback(() => {
+      if (user) loadCatalysts();
+    }, [user, loadCatalysts])
+  );
 
-  // Refresh catalysts
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadCatalysts();
@@ -56,7 +74,12 @@ export default function Index() {
   }, [loadCatalysts]);
 
   const handleCreatePress = () => {
-    if (plan === 'free') {
+    if (!user) {
+      showAlert('Sign in to create', 'Sign in to save and create your own coaches.');
+      router.push('/signin');
+      return;
+    }
+    if (plan === 'free' && !skipRevenueCat) {
       router.push('/paywall');
     } else {
       router.push('/catalyst/create');
@@ -65,15 +88,36 @@ export default function Index() {
 
   const handleSignOut = async () => {
     await signOut();
+    await new Promise((r) => setTimeout(r, 150));
     router.replace('/signin');
   };
 
+  const handleBuiltInCoachPress = (coachId: BuiltInCoachId) => {
+    const coach = BUILT_IN_COACHES.find((c) => c.id === coachId);
+    if (!coach) return;
+    if (coach.proOnly && plan === 'free' && !skipRevenueCat) {
+      router.push('/paywall');
+    } else {
+      router.push(`/catalyst/builtin-${coachId}`);
+    }
+  };
+
   const handleCatalystPress = (catalystId: string) => {
-    router.push(`/catalyst/${catalystId}`);
+    if (!user) {
+      showAlert('Sign in to run', 'Sign in to run your saved coaches.');
+      router.push('/signin');
+      return;
+    }
+    if (plan === 'free' && !skipRevenueCat) {
+      router.push('/paywall');
+    } else {
+      router.push(`/catalyst/${catalystId}`);
+    }
   };
 
   const handleEditPress = (e: any, catalystId: string) => {
     e?.stopPropagation?.();
+    if (!user) return;
     router.push(`/catalyst/${catalystId}/edit`);
   };
 
@@ -84,7 +128,7 @@ export default function Index() {
     if (catalyst.visibility === 'system') return;
 
     const confirmed = await showConfirm(
-      'Delete Catalyst',
+      'Delete Coach',
       `Are you sure you want to delete "${catalyst.name}"? This cannot be undone.`
     );
     if (!confirmed) return;
@@ -92,331 +136,412 @@ export default function Index() {
     try {
       await deleteCatalyst(catalyst.id);
       await loadCatalysts();
-      showAlert('Deleted', 'Catalyst deleted successfully.');
+      showAlert('Deleted', 'Coach deleted successfully.');
     } catch (err) {
       console.error('Delete failed:', err);
-      showAlert('Error', err instanceof Error ? err.message : 'Failed to delete catalyst');
+      showAlert('Error', err instanceof Error ? err.message : 'Failed to delete coach');
     }
   };
 
-  // Show loading or nothing while checking auth
-  if (loading || !user) {
-    return null;
+  const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
+  const showTestNav = __DEV__ || skipRevenueCat || Constants.expoConfig?.extra?.showTestNav;
+
+  const searchLower = searchQuery.trim().toLowerCase();
+  const filteredBuiltIn = searchLower
+    ? BUILT_IN_COACHES.filter(
+        (c) =>
+          c.title.toLowerCase().includes(searchLower) ||
+          c.description.toLowerCase().includes(searchLower)
+      )
+    : BUILT_IN_COACHES;
+  const filteredCatalysts = searchLower
+    ? catalysts.filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchLower) ||
+          (c.description ?? '').toLowerCase().includes(searchLower)
+      )
+    : catalysts;
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={theme.colors.accent} />
+      </View>
+    );
   }
 
+  const bottomPadding = showTestNav ? Math.max(insets.bottom, 48) : insets.bottom;
   return (
-    <ScrollView 
-      style={styles.container} 
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingBottom: theme.spacing.md + bottomPadding }]}
+      refreshControl={user ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
     >
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.title}>Action Catalysts</Text>
+          <Text style={styles.title}>Choose Your Coach</Text>
           <View style={styles.headerActions}>
-            <TouchableOpacity 
-              onPress={() => router.push('/profile')} 
-              style={styles.profileButton}
-            >
-              <Text style={styles.profileButtonText}>Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </TouchableOpacity>
+            {user ? (
+              <>
+                <TouchableOpacity onPress={() => router.push('/history')} style={styles.profileButton}>
+                  <Text style={styles.profileButtonText}>Library</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('/profile')} style={styles.profileButton}>
+                  <Text style={styles.profileButtonText}>Profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+                  <Text style={styles.signOutText}>Sign Out</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity onPress={() => router.push('/signin')} style={styles.signOutButton}>
+                <Text style={styles.signOutText}>Sign In</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
-        <Text style={styles.subtitle}>Turn advice into instant actions</Text>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={18} color={theme.colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search coaches..."
+            placeholderTextColor={theme.colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
         {user?.email && (
           <Text style={styles.userEmail}>Signed in as {user.email}</Text>
         )}
       </View>
 
-      <View style={styles.catalystList}>
-        <Text style={styles.sectionTitle}>Your Catalysts</Text>
-        
-        {loadingCatalysts ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.accent} />
-          </View>
-        ) : catalysts.length === 0 ? (
-          <View style={styles.placeholderCard}>
-            <Text style={styles.placeholderText}>
-              No catalysts yet. Create your first one!
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.catalystsGrid}>
-            {catalysts.map((catalyst) => {
-              const isOwner = user && catalyst.owner_id === user.id;
-              const canEditDelete = isOwner && catalyst.visibility !== 'system';
-              return (
-                <TouchableOpacity
-                  key={catalyst.id}
-                  style={styles.catalystCard}
-                  onPress={() => handleCatalystPress(catalyst.id)}
-                >
-                  <View style={styles.catalystCardHeader}>
-                    <Text style={styles.catalystName}>{catalyst.name}</Text>
-                    {canEditDelete && (
-                      <View style={styles.catalystActions}>
-                        <TouchableOpacity
-                          style={styles.catalystActionButton}
-                          onPress={(e) => handleEditPress(e, catalyst.id)}
-                        >
-                          <Text style={styles.catalystActionText}>Edit</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.catalystActionButton, styles.catalystDeleteButton]}
-                          onPress={(e) => handleDeletePress(e, catalyst)}
-                        >
-                          <Text style={styles.catalystDeleteText}>Delete</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                  {catalyst.description && (
-                    <Text style={styles.catalystDescription} numberOfLines={2}>
-                      {catalyst.description}
+      {/* Built-in Coach Library */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Coach Library</Text>
+        <View style={styles.coachGrid}>
+          {filteredBuiltIn.map((coach) => {
+            const isProOnly = coach.proOnly && plan === 'free';
+            const isPopular = coach.id === 'hook';
+            return (
+              <TouchableOpacity
+                key={coach.id}
+                style={[styles.coachCard, isProOnly && styles.coachCardLocked]}
+                onPress={() => handleBuiltInCoachPress(coach.id)}
+              >
+                <View style={styles.coachCardInner}>
+                  <CoachIcon coachId={coach.id} />
+                  <View style={styles.coachCardContent}>
+                    <View style={styles.coachCardHeader}>
+                      <Text style={styles.coachName}>{coach.title}</Text>
+                      {isPopular && (
+                        <View style={styles.popularPill}>
+                          <Text style={styles.popularPillText}>Popular</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.coachDescription} numberOfLines={2}>
+                      {coach.description}
                     </Text>
+                  </View>
+                </View>
+                <View style={styles.coachCardFooter}>
+                  {coach.proOnly && (
+                    <Text style={styles.proBadge}>Pro</Text>
                   )}
-                  <View style={styles.catalystMeta}>
-                    <Text style={styles.catalystMetaText}>
-                      {catalyst.inputs_json?.length || 0} inputs
-                    </Text>
-                    {catalyst.visibility === 'system' && (
-                      <Text style={styles.systemBadge}>System</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
-        <TouchableOpacity style={styles.createButton} onPress={handleCreatePress}>
-          <Text style={styles.createButtonText}>+ Create Catalyst</Text>
-        </TouchableOpacity>
+                  <Ionicons name="arrow-forward" size={20} color={theme.colors.accent} />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
-      {/* Test Navigation - Remove in production */}
-      <View style={styles.testNav}>
-        <Text style={styles.testNavTitle}>Test Navigation</Text>
-        <View style={styles.testNavButtons}>
-          <TouchableOpacity 
-            style={styles.testNavButton} 
-            onPress={async () => {
-              if (user) {
-                await signOut();
-                // Brief delay so auth state propagates before signin mounts (avoids redirect loop)
-                await new Promise((r) => setTimeout(r, 150));
-                router.replace('/signin');
-              } else {
-                router.push('/signin');
-              }
-            }}
-          >
-            <Text style={styles.testNavButtonText}>{user ? 'Re-sign In' : 'Sign In'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.testNavButton} 
-            onPress={() => router.push('/onboarding')}
-          >
-            <Text style={styles.testNavButtonText}>Onboarding</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.testNavButton} 
-            onPress={() => router.push('/paywall')}
-          >
-            <Text style={styles.testNavButtonText}>Paywall</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.testNavButton, catalysts.length === 0 && styles.testNavButtonDisabled]}
-            onPress={() => {
-              if (catalysts.length === 0) return;
-              if (plan === 'free') {
-                router.push('/paywall');
-              } else {
-                router.push(`/catalyst/${catalysts[0].id}`);
-              }
-            }}
-            disabled={catalysts.length === 0}
-          >
-            <Text style={styles.testNavButtonText}>
-              Run Catalyst
-              {catalysts.length === 0 ? ' (create one first)' : plan === 'free' ? ' → Upgrade' : ''}
-            </Text>
+      {/* User's coaches (only when signed in) */}
+      {user && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Coaches</Text>
+          {loadingCatalysts ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={theme.colors.accent} />
+            </View>
+          ) : filteredCatalysts.length === 0 ? (
+            <TouchableOpacity
+              style={styles.emptyStateCard}
+              onPress={handleCreatePress}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emptyStateTitle}>Create your first Coach</Text>
+              <Text style={styles.emptyStateText}>
+                Build a custom coach tailored to your workflow.
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.coachGrid}>
+              {filteredCatalysts.map((catalyst) => {
+                const isOwner = user && catalyst.owner_id === user.id;
+                const canEditDelete = isOwner && catalyst.visibility !== 'system';
+                return (
+                  <TouchableOpacity
+                    key={catalyst.id}
+                    style={styles.coachCard}
+                    onPress={() => handleCatalystPress(catalyst.id)}
+                  >
+                    <View style={styles.coachCardInner}>
+                      <View style={[styles.coachIcon, { backgroundColor: theme.colors.accent }]}>
+                        <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+                      </View>
+                      <View style={styles.coachCardContent}>
+                        <View style={styles.coachCardHeader}>
+                          <Text style={styles.coachName}>{catalyst.name}</Text>
+                          {canEditDelete && (
+                            <View style={styles.coachActions}>
+                              <TouchableOpacity
+                                style={styles.coachActionButton}
+                                onPress={(e) => handleEditPress(e, catalyst.id)}
+                              >
+                                <Text style={styles.coachActionText}>Edit</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.coachActionButton, styles.coachDeleteButton]}
+                                onPress={(e) => handleDeletePress(e, catalyst)}
+                              >
+                                <Text style={styles.coachDeleteText}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+                        {catalyst.description && (
+                          <Text style={styles.coachDescription} numberOfLines={2}>
+                            {catalyst.description}
+                          </Text>
+                        )}
+                        <View style={styles.coachMeta}>
+                          <Text style={styles.coachMetaText}>
+                            {catalyst.inputs_json?.length || 0} inputs
+                          </Text>
+                          {catalyst.visibility === 'system' && (
+                            <Text style={styles.systemBadge}>System</Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                    <View style={styles.coachCardFooter}>
+                      <Ionicons name="arrow-forward" size={20} color={theme.colors.accent} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          <TouchableOpacity style={styles.createButton} onPress={handleCreatePress}>
+            <Text style={styles.createButtonText}>+ Create Coach</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.testNavSection}>
-          <Text style={styles.testNavLabel}>Current Plan: {plan}</Text>
+      )}
+
+      {showTestNav && (
+        <View style={styles.testNav}>
+          <Text style={styles.testNavTitle}>Test Navigation</Text>
           <View style={styles.testNavButtons}>
-            <TouchableOpacity 
-              style={[styles.testNavButton, plan === 'free' && styles.testNavButtonActive]} 
-              onPress={() => setPlanForTesting?.('free')}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              activeOpacity={0.7}
+            <TouchableOpacity
+              style={styles.testNavButton}
+              onPress={async () => {
+                if (user) {
+                  await signOut();
+                  await new Promise((r) => setTimeout(r, 150));
+                  router.replace('/signin');
+                } else {
+                  router.push('/signin');
+                }
+              }}
             >
-              <Text style={styles.testNavButtonText}>Set Free</Text>
+              <Text style={styles.testNavButtonText}>{user ? 'Re-sign In' : 'Sign In'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.testNavButton, plan === 'pro' && styles.testNavButtonActive]} 
-              onPress={() => setPlanForTesting?.('pro')}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              activeOpacity={0.7}
+            <TouchableOpacity style={styles.testNavButton} onPress={() => router.push('/onboarding')}>
+              <Text style={styles.testNavButtonText}>Onboarding</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.testNavButton} onPress={() => router.push('/paywall')}>
+              <Text style={styles.testNavButtonText}>Paywall</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.testNavButton, catalysts.length === 0 && styles.testNavButtonDisabled]}
+              onPress={() => {
+                if (catalysts.length === 0) return;
+                if (plan === 'free') router.push('/paywall');
+                else router.push(`/catalyst/${catalysts[0].id}`);
+              }}
+              disabled={catalysts.length === 0}
             >
-              <Text style={styles.testNavButtonText}>Set Pro</Text>
+              <Text style={styles.testNavButtonText}>
+                Run Coach
+                {catalysts.length === 0 ? ' (create one first)' : plan === 'free' ? ' → Upgrade' : ''}
+              </Text>
             </TouchableOpacity>
           </View>
+          <View style={styles.testNavSection}>
+            <Text style={styles.testNavLabel}>Current Plan: {plan}</Text>
+            <View style={styles.testNavButtons}>
+              <TouchableOpacity
+                style={[styles.testNavButton, plan === 'free' && styles.testNavButtonActive]}
+                onPress={() => setPlanForTesting?.('free')}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.testNavButtonText}>Set Free</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.testNavButton, plan === 'pro' && styles.testNavButtonActive]}
+                onPress={() => setPlanForTesting?.('pro')}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.testNavButtonText}>Set Pro</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      </View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  content: {
-    padding: theme.spacing.md,
-  },
-  header: {
-    marginBottom: theme.spacing.xl,
-  },
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  content: { padding: theme.spacing.md },
+  header: { marginBottom: theme.spacing.xl },
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
   },
   title: {
     ...theme.typography.h1,
     color: theme.colors.text,
     flex: 1,
   },
-  headerActions: {
+  headerActions: { flexDirection: 'row', gap: theme.spacing.md, alignItems: 'center' },
+  profileButton: { padding: theme.spacing.xs },
+  profileButtonText: { ...theme.typography.bodySmall, color: theme.colors.text },
+  signOutButton: { padding: theme.spacing.xs },
+  signOutText: { ...theme.typography.bodySmall, color: theme.colors.accent },
+  searchContainer: {
     flexDirection: 'row',
-    gap: theme.spacing.md,
     alignItems: 'center',
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
-  profileButton: {
-    padding: theme.spacing.xs,
-  },
-  profileButtonText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.text,
-  },
-  signOutButton: {
-    padding: theme.spacing.xs,
-  },
-  signOutText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.accent,
-  },
-  subtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-  },
-  userEmail: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
-  },
-  catalystList: {
+  searchIcon: { marginRight: theme.spacing.sm },
+  searchInput: {
     flex: 1,
+    ...theme.typography.body,
+    color: theme.colors.text,
+    paddingVertical: theme.spacing.xs,
   },
+  userEmail: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginTop: theme.spacing.xs },
+  section: { marginBottom: theme.spacing.xl },
   sectionTitle: {
     ...theme.typography.h3,
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
-  loadingContainer: {
-    padding: theme.spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 200,
-  },
-  placeholderCard: {
-    backgroundColor: theme.colors.background,
+  loadingContainer: { padding: theme.spacing.lg, alignItems: 'center' },
+  emptyStateCard: {
+    backgroundColor: theme.colors.accentLightBackground,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderStyle: 'dashed',
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 200,
+    minHeight: 120,
     marginBottom: theme.spacing.md,
   },
-  placeholderText: {
+  emptyStateTitle: {
+    ...theme.typography.h3,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+    textAlign: 'center',
+  },
+  emptyStateText: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
     textAlign: 'center',
   },
-  catalystsGrid: {
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-  },
-  catalystCard: {
+  coachGrid: { gap: theme.spacing.md, marginBottom: theme.spacing.md },
+  coachCard: {
     backgroundColor: theme.colors.background,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
+    position: 'relative',
   },
-  catalystCardHeader: {
+  coachCardLocked: { opacity: 0.85 },
+  coachCardInner: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: theme.spacing.xs,
+    flex: 1,
   },
-  catalystActions: {
+  coachCardContent: { flex: 1, marginLeft: theme.spacing.md },
+  coachCardHeader: {
     flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  catalystActionButton: {
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm,
-  },
-  catalystActionText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.accent,
-    fontWeight: '600',
-  },
-  catalystDeleteButton: {},
-  catalystDeleteText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.error,
-    fontWeight: '600',
-  },
-  catalystName: {
-    ...theme.typography.h3,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  catalystDescription: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.sm,
-  },
-  catalystMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
-  catalystMetaText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.textSecondary,
+  coachCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
-  systemBadge: {
+  coachIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  popularPill: {
+    backgroundColor: theme.colors.accentLightBackground,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
+  },
+  popularPillText: {
     ...theme.typography.bodySmall,
     color: theme.colors.accent,
     fontWeight: '600',
+  },
+  coachActions: { flexDirection: 'row', gap: theme.spacing.sm },
+  coachActionButton: { paddingVertical: theme.spacing.xs, paddingHorizontal: theme.spacing.sm },
+  coachActionText: { ...theme.typography.bodySmall, color: theme.colors.accent, fontWeight: '600' },
+  coachDeleteButton: {},
+  coachDeleteText: { ...theme.typography.bodySmall, color: theme.colors.error, fontWeight: '600' },
+  coachName: { ...theme.typography.h3, color: theme.colors.text },
+  coachDescription: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginTop: theme.spacing.xs },
+  coachMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: theme.spacing.xs },
+  coachMetaText: { ...theme.typography.bodySmall, color: theme.colors.textSecondary },
+  systemBadge: { ...theme.typography.bodySmall, color: theme.colors.accent, fontWeight: '600' },
+  proBadge: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.accent,
+    fontWeight: '600',
+    marginRight: theme.spacing.sm,
   },
   createButton: {
     backgroundColor: theme.colors.accent,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.md,
     alignItems: 'center',
   },
@@ -444,23 +569,14 @@ const styles = StyleSheet.create({
   },
   testNavButton: {
     backgroundColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: theme.borderRadius.lg,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
   },
-  testNavButtonText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.text,
-  },
-  testNavButtonActive: {
-    backgroundColor: theme.colors.accent,
-  },
-  testNavButtonDisabled: {
-    opacity: 0.5,
-  },
-  testNavSection: {
-    marginTop: theme.spacing.md,
-  },
+  testNavButtonText: { ...theme.typography.bodySmall, color: theme.colors.text },
+  testNavButtonActive: { backgroundColor: theme.colors.accent },
+  testNavButtonDisabled: { opacity: 0.5 },
+  testNavSection: { marginTop: theme.spacing.md },
   testNavLabel: {
     ...theme.typography.bodySmall,
     color: theme.colors.textSecondary,

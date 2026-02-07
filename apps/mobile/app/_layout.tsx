@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import Constants from 'expo-constants';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@/lib/queryClient';
 import { SupabaseProvider } from '@/src/providers/SupabaseProvider';
 import { ErrorBoundary } from '@/src/components/ErrorBoundary';
@@ -34,8 +35,9 @@ export default function RootLayout() {
   }
 
   return (
-    <ErrorBoundary>
-      <SupabaseProvider>
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <SupabaseProvider>
         <RevenueCatProvider>
           <QueryClientProvider client={queryClient}>
             <StatusBar style="dark" />
@@ -52,17 +54,20 @@ export default function RootLayout() {
             >
               <Stack.Screen name="signin" options={{ title: 'Sign In', headerShown: false }} />
               <Stack.Screen name="auth/callback" options={{ title: 'Signing In', headerShown: false }} />
-              <Stack.Screen name="index" options={{ title: 'Catalysts' }} />
+              <Stack.Screen name="index" options={{ title: 'Choose Your Coach' }} />
+              <Stack.Screen name="history" options={{ title: 'My Library' }} />
+              <Stack.Screen name="history/[id]" options={{ title: 'Saved Run' }} />
               <Stack.Screen name="onboarding" options={{ title: 'Welcome' }} />
               <Stack.Screen name="profile" options={{ title: 'Edit Profile' }} />
-              <Stack.Screen name="catalyst/[id]" options={{ title: 'Run Catalyst' }} />
-              <Stack.Screen name="catalyst/[id]/edit" options={{ title: 'Edit Catalyst' }} />
-              <Stack.Screen name="catalyst/create" options={{ title: 'Create Catalyst' }} />
+              <Stack.Screen name="catalyst/[id]" options={{ title: 'Coach' }} />
+              <Stack.Screen name="catalyst/[id]/edit" options={{ title: 'Edit Coach' }} />
+              <Stack.Screen name="catalyst/create" options={{ title: 'Create Coach' }} />
               <Stack.Screen name="paywall" options={{ title: 'Upgrade' }} />
             </Stack>
           </QueryClientProvider>
         </RevenueCatProvider>
-      </SupabaseProvider>
-    </ErrorBoundary>
+        </SupabaseProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }

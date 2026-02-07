@@ -21,6 +21,7 @@ function getEnvValue(key: string): string {
       SUPABASE_URL: 'supabaseUrl',
       SUPABASE_ANON_KEY: 'supabaseAnonKey',
       EDGE_FUNCTION_BASE_URL: 'edgeFunctionBaseUrl',
+      AUTH_REDIRECT_WEB_URL: 'authRedirectWebUrl',
     };
     return extra[keyMap[key] || key] || '';
   }
@@ -52,5 +53,8 @@ export const supabaseConfig = {
   },
   get edgeFunctionBaseUrl() {
     return getEdgeFunctionBaseUrl();
+  },
+  get authRedirectWebUrl() {
+    return getEnvValue('AUTH_REDIRECT_WEB_URL');
   },
 };

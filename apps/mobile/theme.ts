@@ -3,9 +3,10 @@ export const theme = {
     background: '#FFFFFF',
     text: '#1A1A1A',
     textSecondary: '#666666',
-    accent: '#6366F1', // Indigo accent color
+    accent: '#6366F1', // Indigo accent color (primary brand purple)
     accentLight: '#818CF8',
     accentDark: '#4F46E5',
+    accentLightBackground: '#F0F5FF', // Light purple tint for highlight cards
     border: '#E5E7EB',
     error: '#EF4444',
     success: '#10B981',

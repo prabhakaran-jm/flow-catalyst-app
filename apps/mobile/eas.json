@@ -30,7 +30,10 @@
       "android": {
         "buildType": "app-bundle"
       },
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_SHOW_TEST_NAV": "true"
+      }
     }
   },
   "submit": {

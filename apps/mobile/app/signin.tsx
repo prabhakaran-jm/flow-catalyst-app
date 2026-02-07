@@ -14,13 +14,13 @@ export default function SignIn() {
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
 
-  // Check for error from callback (e.g., expired link)
+  // Check for error from callback
   useEffect(() => {
     const errorParam = params.error as string | undefined;
     if (errorParam) {
       const decodedError = decodeURIComponent(errorParam);
       if (decodedError === 'expired' || decodedError.toLowerCase().includes('expired')) {
-        setError('This magic link has expired. Please request a new one.');
+        setError('Your code has expired. Please request a new one.');
       } else {
         setError(decodedError);
       }
@@ -72,37 +72,36 @@ export default function SignIn() {
         const errorMessage = error.message?.toLowerCase() || String(error).toLowerCase();
         if (errorMessage.includes('rate limit') || errorMessage.includes('too many')) {
           setError(
-            'Too many requests. Please wait a few minutes before requesting another magic link. ' +
-            'If you already received an email, check your inbox and click the link.'
+            'Too many requests. Please wait a few minutes before requesting another code.'
           );
         } else {
           // Better error message handling
-          const message = error.message || error.toString() || JSON.stringify(error) || 'Failed to send magic link';
+          const message = error.message || error.toString() || JSON.stringify(error) || 'Failed to send verification code';
           console.error('Supabase auth error:', error);
           setError(message);
         }
       } else {
         setEmailSent(true);
         Alert.alert(
-          'Email Sent',
+          'Code Sent',
           __DEV__
-            ? 'Check Mailpit (http://127.0.0.1:54324) for your magic link. Click the link to sign in.'
-            : 'Check your email for the magic link. Click the link to sign in, or enter the code below.',
+            ? 'Check Mailpit (http://127.0.0.1:54324) for your verification code.'
+            : 'Check your email for the verification code and enter it below.',
           [{ text: 'OK' }]
         );
       }
     } catch (err) {
       // Better error handling for unexpected errors
-      console.error('Unexpected error sending magic link:', err);
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : typeof err === 'string' 
-        ? err 
-        : JSON.stringify(err) || 'Failed to send magic link. Check console for details.';
-      
+      console.error('Unexpected error sending verification code:', err);
+      const errorMessage = err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+        ? err
+        : JSON.stringify(err) || 'Failed to send verification code. Check console for details.';
+
       if (errorMessage.toLowerCase().includes('rate limit')) {
         setError(
-          'Too many requests. Please wait a few minutes before requesting another magic link.'
+          'Too many requests. Please wait a few minutes before requesting another code.'
         );
       } else if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('fetch')) {
         setError('Network error. Make sure Supabase is running locally (npx supabase start)');
@@ -134,7 +133,7 @@ export default function SignIn() {
       if (verifyError) {
         const msg = verifyError.message || verifyError.name || 'Invalid code';
         if (msg.toLowerCase().includes('expired') || msg.toLowerCase().includes('invalid')) {
-          setError('This code has expired. Please request a new magic link.');
+          setError('This code has expired or is invalid. Please request a new one.');
         } else {
           setError(msg);
         }
@@ -162,7 +161,7 @@ export default function SignIn() {
           <Text style={styles.title}>Welcome to Flow Catalyst</Text>
           <Text style={styles.subtitle}>
             {emailSent
-              ? 'Check your email and click the magic link to sign in'
+              ? 'Enter the code from your email to sign in'
               : 'Enter your email to get started'}
           </Text>
         </View>
@@ -171,9 +170,6 @@ export default function SignIn() {
           <View style={styles.form}>
             <View style={styles.field}>
               <Text style={styles.label}>Email Address</Text>
-              <Text style={styles.hint}>
-                Note: Rate limits are per email address. Try a different email if you hit the limit.
-              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="you@example.com"
@@ -197,30 +193,6 @@ export default function SignIn() {
             {error && (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
-                {error.toLowerCase().includes('rate limit') && (
-                  <View style={styles.errorHintContainer}>
-                    <Text style={styles.errorHint}>
-                      💡 Solutions:
-                    </Text>
-                    <Text style={styles.errorHint}>
-                      • Check your email inbox for an existing magic link
-                    </Text>
-                    <Text style={styles.errorHint}>
-                      • Try a different email address
-                    </Text>
-                    <Text style={styles.errorHint}>
-                      • Wait 1 hour for the rate limit to reset
-                    </Text>
-                    <Text style={styles.errorHint}>
-                      • If you have a magic link URL, paste it in your browser's address bar
-                    </Text>
-                  </View>
-                )}
-                {error.toLowerCase().includes('expired') && (
-                  <Text style={styles.errorHint}>
-                    💡 Magic links expire after 1 hour. Request a new one to continue.
-                  </Text>
-                )}
               </View>
             )}
 
@@ -232,7 +204,7 @@ export default function SignIn() {
               {loading ? (
                 <ActivityIndicator color={theme.colors.background} />
               ) : (
-                <Text style={styles.buttonText}>Send Magic Link</Text>
+                <Text style={styles.buttonText}>Send Verification Code</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -240,20 +212,20 @@ export default function SignIn() {
           <View style={styles.form}>
             <View style={styles.emailSentContainer}>
               <Text style={styles.emailSentText}>
-                We've sent a magic link to:
+                We've sent a verification code to:
               </Text>
               <Text style={styles.emailAddress}>{email}</Text>
               <Text style={styles.emailSentHint}>
-                Click the link in your email to sign in, or enter the code below (recommended for emulator).
+                Enter the 8-digit code from your email below.
                 {'\n\n'}
-                ⚠️ Magic links expire after 1 hour. If your link expired, click "Resend Email" below.
+                Codes expire after 1 hour. If expired, tap "Resend Code" below.
               </Text>
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Or enter the code from your email</Text>
+              <Text style={styles.label}>Verification Code</Text>
               <Text style={styles.hint}>
-                Enter the numeric code from your email (usually 6-8 digits)
+                Enter the 8-digit code from your email
               </Text>
               <TextInput
                 style={styles.input}
@@ -273,7 +245,7 @@ export default function SignIn() {
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleVerifyOtp}
-              disabled={loading || otpCode.length < 6}
+              disabled={loading || otpCode.length < 8}
             >
               {loading ? (
                 <ActivityIndicator color={theme.colors.background} />
@@ -289,10 +261,10 @@ export default function SignIn() {
             )}
 
             <TouchableOpacity
-              style={styles.button}
+              style={styles.secondaryButton}
               onPress={handleResendEmail}
             >
-              <Text style={styles.buttonText}>Resend Email</Text>
+              <Text style={styles.secondaryButtonText}>Resend Code</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -374,6 +346,20 @@ const styles = StyleSheet.create({
     color: theme.colors.background,
     fontWeight: '600',
   },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: theme.colors.accent,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    alignItems: 'center',
+    marginTop: theme.spacing.md,
+  },
+  secondaryButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.accent,
+    fontWeight: '600',
+  },
   linkButton: {
     marginTop: theme.spacing.md,
     padding: theme.spacing.md,
@@ -404,7 +390,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
   },
   emailSentContainer: {
-    backgroundColor: '#F0F9FF',
+    backgroundColor: theme.colors.accentLightBackground,
     borderWidth: 1,
     borderColor: theme.colors.accent,
     borderRadius: theme.borderRadius.md,

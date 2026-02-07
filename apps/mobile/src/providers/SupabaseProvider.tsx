@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { Session, User, AuthError } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 import { supabaseClient } from '@/src/lib/supabaseClient';
+import { supabaseConfig } from '@/src/lib/supabaseConfig';
 
 interface SupabaseContextType {
   user: User | null;
@@ -61,19 +62,24 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
    * @returns Promise with error if sign-in fails
    */
   const signInWithOtp = async (email: string): Promise<{ error: AuthError | null }> => {
-    // Determine redirect URL based on platform
+    // Determine redirect URL
+    // IMPORTANT: Android strips hash fragments (#access_token=...) from deep links.
+    // Use AUTH_REDIRECT_WEB_URL so the magic link opens a web page first; that page
+    // redirects to flowcatalyst://auth/callback?access_token=... (query params are preserved).
+    const webRedirectUrl = supabaseConfig.authRedirectWebUrl;
     let redirectUrl: string;
-    
+
     if (Platform.OS === 'web') {
-      // For web, use the current origin (works with any port Expo assigns)
       if (typeof window !== 'undefined' && window.location) {
         redirectUrl = `${window.location.origin}/auth/callback`;
       } else {
-        // Fallback for local development - use port 8081 (common Expo web port)
         redirectUrl = 'http://127.0.0.1:8081/auth/callback';
       }
+    } else if (webRedirectUrl) {
+      // Mobile: use web URL so we can redirect to app with query params (fixes Android)
+      redirectUrl = webRedirectUrl.replace(/\/$/, '') + '/auth/callback';
     } else {
-      // Use deep link for mobile apps (iOS/Android)
+      // Fallback: direct deep link (works on iOS; Android may lose hash with tokens)
       redirectUrl = 'flowcatalyst://auth/callback';
     }
     
@@ -108,7 +114,7 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
   /**
    * Verify OTP code from magic link email.
    * Use this when the magic link opens in a browser (e.g. emulator dev) and can't deep-link back.
-   * The 6-digit code is shown in the email as "Alternatively, enter the code: XXXXXX"
+   * The 8-digit code is shown in the email
    */
   const verifyOtp = async (email: string, token: string): Promise<{ error: AuthError | null }> => {
     try {

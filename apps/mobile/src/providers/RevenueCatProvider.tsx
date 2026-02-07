@@ -26,6 +26,7 @@ interface RevenueCatContextType {
   plan: Plan;
   refreshEntitlements: () => Promise<void>;
   purchasePro: () => Promise<void>;
+  restorePurchases: () => Promise<void>;
   setPlanForTesting?: (plan: Plan) => void; // For testing only
 }
 
@@ -184,6 +185,19 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     }
   };
 
+  const restorePurchases = async (): Promise<void> => {
+    try {
+      const customerInfo = await Purchases.restorePurchases();
+      const isPro = customerInfo.entitlements.active['pro'] !== undefined;
+      setPlan(isPro ? 'pro' : 'free');
+      if (!isPro) {
+        throw new Error('No active subscription found');
+      }
+    } catch (error: any) {
+      throw error;
+    }
+  };
+
   // For testing: allow manual plan switching (overrides refreshEntitlements until user changes)
   const setPlanForTesting = (newPlan: Plan) => {
     setTestingOverride(newPlan);
@@ -194,6 +208,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     plan: testingOverride ?? plan,
     refreshEntitlements,
     purchasePro,
+    restorePurchases,
     setPlanForTesting,
   };
 

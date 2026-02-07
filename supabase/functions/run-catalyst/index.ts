@@ -10,7 +10,12 @@ const corsHeaders = {
 };
 
 interface RunCatalystRequest {
-  catalyst_id: string;
+  catalyst_id?: string;
+  /** For built-in coaches: allows anonymous run without auth */
+  built_in?: {
+    id: string;
+    prompt_template: string;
+  };
   inputs: Record<string, any>;
 }
 
@@ -277,53 +282,71 @@ serve(async (req) => {
   }
 
   try {
-    // Get authorization header
     const authHeader = req.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '') || '';
+
+    // Parse request body early to check for built-in (anonymous) path
+    const body: RunCatalystRequest = await req.json();
+    const { catalyst_id, built_in, inputs } = body;
+
+    // Built-in coaches: allow anonymous run (no auth required)
+    if (built_in?.id && built_in?.prompt_template) {
+      if (!inputs || typeof inputs !== 'object') {
+        return new Response(
+          JSON.stringify({ error: 'Missing or invalid inputs' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      let prompt = built_in.prompt_template;
+      for (const [key, value] of Object.entries(inputs)) {
+        const placeholder1 = `{${key}}`;
+        const placeholder2 = `{{${key}}}`;
+        const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+        prompt = prompt.replace(new RegExp(placeholder1.replace(/[{}]/g, '\\$&'), 'g'), stringValue);
+        prompt = prompt.replace(new RegExp(placeholder2.replace(/[{}]/g, '\\$&'), 'g'), stringValue);
+      }
+      prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis, - for bullets. Ensure headings start with ## on a new line with a space after ##. Be scannable.]`;
+      const promptDebug = `Built-in: ${built_in.id}\nInputs: ${JSON.stringify(inputs, null, 2)}\n\nFinal Prompt:\n${prompt}`;
+      try {
+        const aiOutput = await callAI(prompt);
+        return new Response(JSON.stringify({ output: aiOutput, promptDebug }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('[run-catalyst] AI API call failed:', error);
+        const aiOutput = `Error generating AI response: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your AI API configuration.`;
+        return new Response(JSON.stringify({ output: aiOutput, promptDebug: `Error: ${error}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Standard path: requires auth
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Extract JWT token
-    const token = authHeader.replace('Bearer ', '');
-
-    // Initialize Supabase client with service role key
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
     if (!supabaseUrl || !supabaseServiceKey) {
       return new Response(
         JSON.stringify({ error: 'Missing Supabase configuration' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+      auth: { autoRefreshToken: false, persistSession: false },
     });
-    console.log('[run-catalyst] Supabase client created');
 
-    // Authenticate user from JWT
-    // NOTE: Local Supabase has issues with ES256 JWT verification
-    // This is a known limitation - see: https://github.com/supabase/cli/issues/4453
     let user;
     let authError;
-    
     try {
-      console.log('[run-catalyst] Calling getUser...');
       const result = await supabaseClient.auth.getUser(token);
-      console.log('[run-catalyst] getUser result:', result.error ? 'error' : 'ok', result.data?.user?.id || 'no user');
       user = result.data.user;
       authError = result.error;
     } catch (err) {
@@ -383,10 +406,6 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
-    const body: RunCatalystRequest = await req.json();
-    const { catalyst_id, inputs } = body;
-
     if (!catalyst_id) {
       return new Response(
         JSON.stringify({ error: 'Missing catalyst_id' }),
@@ -419,7 +438,7 @@ serve(async (req) => {
       );
     }
 
-    // Load user's profile
+    // Load user's profile (needed for rate limit bypass and prompt context)
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('*')
@@ -429,6 +448,29 @@ serve(async (req) => {
     // Profile is optional, continue even if not found
     if (profileError && profileError.code !== 'PGRST116') {
       console.error('Error loading profile:', profileError);
+    }
+
+    // Server-side rate limit: 3 runs/day for free tier; Pro users bypass
+    const isPro = profile?.plan === 'pro';
+    if (!isPro) {
+      const today = new Date().toISOString().slice(0, 10);
+      const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      const { count, error: countError } = await supabaseClient
+        .from('catalyst_runs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', `${today}T00:00:00Z`)
+        .lt('created_at', `${tomorrow}T00:00:00Z`);
+      const dailyLimit = parseInt(Deno.env.get('DAILY_RUN_LIMIT') || '3', 10);
+      if (!countError && (count ?? 0) >= dailyLimit) {
+        return new Response(
+          JSON.stringify({
+            error: 'Daily limit reached',
+            details: `You've used ${dailyLimit} runs today. Upgrade to Pro for unlimited runs.`,
+          }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Build the prompt from template and inputs

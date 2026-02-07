@@ -88,7 +88,7 @@ supabase migration up
 
 ```bash
 # Serve functions with env vars from .env (required for OpenRouter/AI)
-supabase functions serve create-catalyst run-catalyst --no-verify-jwt --env-file .env
+supabase functions serve create-catalyst run-catalyst refine --no-verify-jwt --env-file .env
 ```
 
 ### 6. Run Expo Mobile App
@@ -113,12 +113,13 @@ Edge Functions are located in `supabase/functions/`:
 
 - **run-catalyst**: Executes a catalyst with user inputs and returns AI-generated output
 - **create-catalyst**: Creates a new catalyst for authenticated users
+- **refine**: Refines user text (advice/context) for the Magic Wand button; uses same AI provider as run-catalyst
 
 ### Testing Edge Functions Locally
 
 ```bash
 # Start functions server (--env-file loads .env for AI/OpenRouter API keys)
-supabase functions serve create-catalyst run-catalyst --no-verify-jwt --env-file .env
+supabase functions serve create-catalyst run-catalyst refine --no-verify-jwt --env-file .env
 
 # Test with curl (replace with your JWT token)
 curl -X POST http://localhost:54321/functions/v1/run-catalyst \
@@ -150,14 +151,17 @@ supabase db reset
 2. Push migrations: `supabase db push`
 3. Deploy functions (requires Docker Desktop running):
    ```bash
-   supabase functions deploy run-catalyst
+   # run-catalyst needs --no-verify-jwt for built-in coaches (anonymous Get Guidance)
+   supabase functions deploy run-catalyst --no-verify-jwt
    supabase functions deploy create-catalyst
+   supabase functions deploy refine
    ```
    
    **If Docker isn't available**, use the API method:
    ```bash
-   supabase functions deploy run-catalyst --use-api
+   supabase functions deploy run-catalyst --no-verify-jwt --use-api
    supabase functions deploy create-catalyst --use-api
+   supabase functions deploy refine --use-api
    ```
 
 ### Expo
@@ -181,12 +185,44 @@ eas build --platform android
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY`: Service role key (keep secret!)
 
+## RevenueCat Setup (Required for Paywall)
+
+For the paywall to show offerings (not "No offerings available"):
+
+1. **Entitlement**: Create `pro` entitlement in RevenueCat Dashboard
+2. **Offering**: Add Current offering with packages (`$rc_monthly`, `$rc_annual`)
+3. **Products**: Link packages to subscriptions in App Store Connect / Play Console
+4. **Keys**: Add `REVENUECAT_API_KEY_IOS` and `REVENUECAT_API_KEY_ANDROID` to env
+
+See **`docs/REVENUECAT_SETUP.md`** for step-by-step instructions.
+
+## Testing Pro Features Without RevenueCat
+
+While waiting for Play Store / App Store developer activation:
+
+1. **Use preview build** (`eas build --platform android --profile preview`):
+   - Uses `RevenueCatProvider.stub` (no store SDK)
+   - Test Navigation is visible with **Set Pro** / **Set Free** buttons
+   - Tap **Set Pro** to unlock Create Coach, all coaches, and unlimited runs
+
+   **Set Pro not visible?** Test Navigation appears when: running in dev (`expo start`), preview/development EAS builds, or when `EXPO_PUBLIC_SHOW_TEST_NAV=true` is set at build time.
+
+2. **Redeploy run-catalyst** with `--no-verify-jwt` so built-in coaches work without auth:
+   ```bash
+   supabase functions deploy run-catalyst --no-verify-jwt
+   ```
+
 ## Testing & Deployment
 
 - **Quick Start**: See `QUICK_START.md` for immediate testing steps
 - **Testing Guide**: See `STEP_BY_STEP_TESTING.md` for detailed testing walkthrough
 - **Deployment Guide**: See `DEPLOYMENT_GUIDE.md` for production deployment
 - **Testing Checklist**: See `TESTING_CHECKLIST.md` for comprehensive test cases
+
+## Troubleshooting
+
+- **Enable magic link (click-to-sign-in)**: See `docs/AUTH_EMAIL_TROUBLESHOOTING.md` — deploy web app, set `AUTH_REDIRECT_WEB_URL`, add redirect URL in Supabase.
+- **"Error sending confirmation email"**: See `docs/AUTH_EMAIL_TROUBLESHOOTING.md` for SMTP setup and rate limits.
 
 ## Setup Guides
 

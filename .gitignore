@@ -62,6 +62,7 @@ web-build/
 *.mobileprovision
 *.orig.*
 expo-env.d.ts
+.cursor/
 
 # Native directories (managed workflow - let EAS generate these)
 apps/mobile/android/

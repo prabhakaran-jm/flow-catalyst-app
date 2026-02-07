@@ -35,7 +35,7 @@ if lsof -Pi :9999 -sTCP:LISTEN -t >/dev/null 2>&1 || netstat -an | grep 9999 | g
 else
     echo -e "${YELLOW}⚠${NC} Edge Functions server not detected"
     echo "   Start in a separate terminal:"
-    echo "   npx supabase functions serve create-catalyst run-catalyst --no-verify-jwt --env-file .env"
+    echo "   npx supabase functions serve create-catalyst run-catalyst refine --no-verify-jwt --env-file .env"
 fi
 
 # Check environment variables
@@ -83,7 +83,7 @@ echo ""
 echo "✅ Setup Check Complete!"
 echo ""
 echo "Next steps:"
-echo "1. Start Edge Functions: npx supabase functions serve create-catalyst run-catalyst --no-verify-jwt --env-file .env"
+echo "1. Start Edge Functions: npx supabase functions serve create-catalyst run-catalyst refine --no-verify-jwt --env-file .env"
 echo "2. Start Expo: pnpm start"
 echo "3. Open app on device/emulator"
 echo "4. Follow TESTING_CHECKLIST.md"
