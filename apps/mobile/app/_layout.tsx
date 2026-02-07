@@ -1,10 +1,16 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
+import Constants from 'expo-constants';
 import { queryClient } from '@/lib/queryClient';
 import { SupabaseProvider } from '@/src/providers/SupabaseProvider';
-import { RevenueCatProvider } from '@/src/providers/RevenueCatProvider';
 import { ErrorBoundary } from '@/src/components/ErrorBoundary';
+
+// Use stub when sideloaded (preview build) - avoids RevenueCat native SDK crash
+const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
+const RevenueCatProvider = skipRevenueCat
+  ? require('@/src/providers/RevenueCatProvider.stub').RevenueCatProvider
+  : require('@/src/providers/RevenueCatProvider').RevenueCatProvider;
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';

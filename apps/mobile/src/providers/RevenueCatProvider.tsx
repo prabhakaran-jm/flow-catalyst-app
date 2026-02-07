@@ -49,12 +49,20 @@ interface RevenueCatProviderProps {
 export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const { user } = useSupabase();
   const [plan, setPlan] = useState<Plan>('free');
+  const [testingOverride, setTestingOverride] = useState<Plan | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize RevenueCat SDK
+  // Initialize RevenueCat SDK (skip when sideloaded - preview/dev builds not from Play Store)
   useEffect(() => {
     const initializeRevenueCat = async () => {
       try {
+        const extra = Constants.expoConfig?.extra || {};
+        if (extra.skipRevenueCat) {
+          console.warn('RevenueCat skipped (preview/internal build). Using free plan.');
+          setIsInitialized(true);
+          return;
+        }
+
         const apiKey = Platform.select({
           ios: getRevenueCatApiKey('ios'),
           android: getRevenueCatApiKey('android'),
@@ -101,6 +109,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         } else {
           await Purchases.logOut();
           setPlan('free');
+          setTestingOverride(null);
         }
       } catch (error) {
         console.error('Failed to update RevenueCat user ID:', error);
@@ -175,17 +184,14 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     }
   };
 
-  // For testing: allow manual plan switching (only in development)
+  // For testing: allow manual plan switching (overrides refreshEntitlements until user changes)
   const setPlanForTesting = (newPlan: Plan) => {
-    if (__DEV__) {
-      setPlan(newPlan);
-    } else {
-      console.warn('setPlanForTesting is only available in development mode');
-    }
+    setTestingOverride(newPlan);
+    setPlan(newPlan);
   };
 
   const value: RevenueCatContextType = {
-    plan,
+    plan: testingOverride ?? plan,
     refreshEntitlements,
     purchasePro,
     setPlanForTesting,

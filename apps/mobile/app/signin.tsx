@@ -85,7 +85,9 @@ export default function SignIn() {
         setEmailSent(true);
         Alert.alert(
           'Email Sent',
-          'Check Mailpit (http://127.0.0.1:54324) for your magic link. Click the link to sign in.',
+          __DEV__
+            ? 'Check Mailpit (http://127.0.0.1:54324) for your magic link. Click the link to sign in.'
+            : 'Check your email for the magic link. Click the link to sign in, or enter the code below.',
           [{ text: 'OK' }]
         );
       }

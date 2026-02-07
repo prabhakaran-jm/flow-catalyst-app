@@ -28,9 +28,13 @@ export default function Paywall() {
       ]);
     } catch (error) {
       console.error('Purchase error:', error);
+      const msg = error instanceof Error ? error.message : 'Failed to complete purchase.';
+      const isConfigError = msg.toLowerCase().includes('configuration') || msg.toLowerCase().includes('config');
       Alert.alert(
         'Purchase Failed',
-        error instanceof Error ? error.message : 'Failed to complete purchase. Please try again.'
+        isConfigError
+          ? 'In-app purchases require proper setup: ensure products are created in Google Play Console and linked in RevenueCat Dashboard.'
+          : msg
       );
     } finally {
       setLoadingMonthly(false);

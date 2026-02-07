@@ -1,14 +1,61 @@
 import { useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator, Text, Linking } from 'react-native';
 import { supabaseClient } from '@/src/lib/supabaseClient';
 import { theme } from '@/theme';
 
 /**
+ * Parses tokens from URL (Supabase uses hash: flowcatalyst://auth/callback#access_token=...&refresh_token=...)
+ */
+function parseTokensFromUrl(url: string): { access_token?: string; refresh_token?: string } {
+  const hashIdx = url.indexOf('#');
+  const queryIdx = url.indexOf('?');
+  const fragment = hashIdx >= 0 ? url.slice(hashIdx + 1) : '';
+  const query = queryIdx >= 0 ? url.slice(queryIdx + 1).split('#')[0] : '';
+
+  const parse = (s: string) => {
+    const params: Record<string, string> = {};
+    s.split('&').forEach((p) => {
+      const eq = p.indexOf('=');
+      if (eq < 0) return;
+      const k = decodeURIComponent(p.slice(0, eq));
+      const v = decodeURIComponent(p.slice(eq + 1).replace(/\+/g, ' '));
+      if (k && v) params[k] = v;
+    });
+    return params;
+  };
+
+  const fromFragment = fragment ? parse(fragment) : {};
+  const fromQuery = query ? parse(query) : {};
+  const merged = { ...fromQuery, ...fromFragment };
+  return {
+    access_token: merged.access_token,
+    refresh_token: merged.refresh_token,
+  };
+}
+
+async function createSessionFromUrl(url: string): Promise<boolean> {
+  try {
+    const { access_token, refresh_token } = parseTokensFromUrl(url);
+    if (!access_token) return false;
+
+    const { error } = await supabaseClient.auth.setSession({
+      access_token,
+      refresh_token: refresh_token || '',
+    });
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error('createSessionFromUrl error:', err);
+    return false;
+  }
+}
+
+/**
  * Auth Callback Handler
- * 
+ *
  * Handles magic link redirects from Supabase.
- * This route is called when a user clicks the magic link in their email.
+ * When user clicks the magic link, the app opens with flowcatalyst://auth/callback#...
  */
 export default function AuthCallback() {
   const router = useRouter();
@@ -20,31 +67,32 @@ export default function AuthCallback() {
         // Check for error parameters in URL (e.g., expired link)
         const errorParam = params.error as string | undefined;
         const errorDescription = params.error_description as string | undefined;
-        
+
         if (errorParam) {
-          // Handle specific error cases
           let errorMessage = 'Authentication failed';
-          
           if (errorParam === 'access_denied' || errorParam === 'otp_expired') {
             errorMessage = 'expired';
           } else if (errorDescription) {
             errorMessage = decodeURIComponent(errorDescription).replace(/\+/g, ' ');
           }
-          
-          // Redirect to sign-in with error message
           router.replace(`/signin?error=${encodeURIComponent(errorMessage)}`);
           return;
         }
 
-        // Wait a moment for Supabase to process the URL hash fragments
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Supabase will automatically parse the URL tokens if detectSessionInUrl is enabled
+        // Get URL that opened the app (magic link) - tokens are in hash
+        const url = await Linking.getInitialURL();
+        if (url && (url.includes('access_token') || url.includes('#access_token'))) {
+          const ok = await createSessionFromUrl(url);
+          if (ok) {
+            router.replace('/');
+            return;
+          }
+        }
+
+        // Fallback: check existing session (e.g. tokens already processed)
         const { data: { session }, error } = await supabaseClient.auth.getSession();
 
         if (error) {
-          console.error('Auth callback error:', error);
-          // Check if it's an expired link error
           if (error.message?.toLowerCase().includes('expired') || error.message?.toLowerCase().includes('invalid')) {
             router.replace('/signin?error=expired');
           } else {
@@ -54,10 +102,8 @@ export default function AuthCallback() {
         }
 
         if (session) {
-          // Successfully authenticated, redirect to home
           router.replace('/');
         } else {
-          // No session found, redirect to sign-in
           router.replace('/signin');
         }
       } catch (err) {
@@ -68,6 +114,17 @@ export default function AuthCallback() {
 
     handleAuthCallback();
   }, [router, params]);
+
+  // Handle URL when app is already open (warm start)
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', async ({ url }) => {
+      if (url && (url.includes('access_token') || url.includes('#access_token'))) {
+        const ok = await createSessionFromUrl(url);
+        if (ok) router.replace('/');
+      }
+    });
+    return () => sub.remove();
+  }, [router]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>

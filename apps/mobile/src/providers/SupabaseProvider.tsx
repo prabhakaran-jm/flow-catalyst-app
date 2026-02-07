@@ -130,10 +130,11 @@ export function SupabaseProvider({ children }: SupabaseProviderProps) {
 
   /**
    * Sign out the current user
+   * Uses scope: 'global' to clear session from storage and invalidate tokens
    * @returns Promise with error if sign-out fails
    */
   const signOut = async (): Promise<{ error: AuthError | null }> => {
-    const { error } = await supabaseClient.auth.signOut();
+    const { error } = await supabaseClient.auth.signOut({ scope: 'global' });
     return { error };
   };
 

@@ -6,7 +6,6 @@ import { runCatalyst, fetchCatalyst, deleteCatalyst, Catalyst } from '@/src/lib/
 import { showAlert, showConfirm } from '@/src/lib/alert';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
-import { getTodayRunCount, hasReachedDailyLimit, incrementRunCount } from '@/src/lib/runLimits';
 import Markdown from 'react-native-markdown-display';
 
 export default function CatalystDetail() {
@@ -30,7 +29,6 @@ export default function CatalystDetail() {
   const [promptDebug, setPromptDebug] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [runCount, setRunCount] = useState<number | null>(null);
   const [limitReached, setLimitReached] = useState(false);
 
   const loadCatalyst = useCallback(async () => {
@@ -55,17 +53,11 @@ export default function CatalystDetail() {
     }, [user, loadCatalyst])
   );
 
-  // Check run count on mount
+  // Free users cannot run - show upgrade prompt
   useEffect(() => {
-    const checkLimit = async () => {
-      if (plan === 'free') {
-        const count = await getTodayRunCount();
-        const reached = await hasReachedDailyLimit();
-        setRunCount(count);
-        setLimitReached(reached);
-      }
-    };
-    checkLimit();
+    if (plan === 'free') {
+      setLimitReached(true);
+    }
   }, [plan]);
 
   const handleAddInput = () => {
@@ -113,13 +105,10 @@ export default function CatalystDetail() {
   const handleRun = async () => {
     if (!id) return;
 
-    // Check plan and limits
+    // Free users must upgrade to run catalysts
     if (plan === 'free') {
-      const reached = await hasReachedDailyLimit();
-      if (reached) {
-        router.push('/paywall');
-        return;
-      }
+      router.push('/paywall');
+      return;
     }
 
     setLoading(true);
@@ -134,15 +123,6 @@ export default function CatalystDetail() {
       });
       setOutput(result.output);
       setPromptDebug(result.promptDebug);
-
-      // Increment run count for free users
-      if (plan === 'free') {
-        const newCount = await incrementRunCount();
-        setRunCount(newCount);
-        if (newCount >= 3) {
-          setLimitReached(true);
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to run catalyst');
     } finally {
@@ -194,9 +174,9 @@ export default function CatalystDetail() {
         {catalyst.description && (
           <Text style={styles.description}>{catalyst.description}</Text>
         )}
-        {isFreeUser && runCount !== null && (
+        {isFreeUser && (
           <Text style={styles.runCount}>
-            Runs today: {runCount}/3
+            Upgrade to Pro to run this catalyst
           </Text>
         )}
       </View>
@@ -204,7 +184,7 @@ export default function CatalystDetail() {
       {showLimitWarning && (
         <View style={styles.limitWarning}>
           <Text style={styles.limitWarningText}>
-            You've reached your daily limit of 3 runs. Upgrade to Pro for unlimited runs!
+            Upgrade to Pro to run catalysts. Free plan does not include running.
           </Text>
           <TouchableOpacity
             style={styles.upgradeButton}

@@ -9,19 +9,39 @@
  */
 const base = require('./app.json');
 
-// Disable automatic update checks on launch - can cause crashes if channel/runtime mismatch
-const updatesConfig = {
-  ...(base.expo.updates || {}),
-  checkAutomatically: 'NEVER',
-};
-
 module.exports = {
   ...base,
   expo: {
     ...base.expo,
-    updates: updatesConfig,
+    // Ensure flowcatalyst:// deep links open in app (magic link auth)
+    android: {
+      ...base.expo.android,
+      intentFilters: [
+        {
+          action: 'VIEW',
+          data: [
+            { scheme: 'flowcatalyst', host: '*', pathPrefix: '/' },
+          ],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
+    },
+    plugins: [
+      ...(base.expo.plugins || []),
+      'expo-asset',
+      'expo-font',
+    ],
+    updates: {
+      url: 'https://u.expo.dev/1ab86178-046a-4e57-9bd7-94505216d86c',
+      checkAutomatically: 'NEVER', // Avoid launch crashes; use manual update checks
+    },
+    runtimeVersion: {
+      policy: 'appVersion',
+    },
     extra: {
       ...base.expo.extra,
+      // Skip RevenueCat on preview/internal builds - SDK can crash when app is sideloaded (not from Play Store)
+      skipRevenueCat: process.env.EAS_BUILD_PROFILE === 'preview' || process.env.EAS_BUILD_PROFILE === 'development',
       // Inject EAS env vars at build time (fallback to placeholders for local dev)
       supabaseUrl: process.env.SUPABASE_URL || base.expo.extra.supabaseUrl,
       supabaseAnonKey: process.env.SUPABASE_ANON_KEY || base.expo.extra.supabaseAnonKey,

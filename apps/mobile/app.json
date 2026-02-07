@@ -37,9 +37,11 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "1.9.25",
+            "kotlinVersion": "2.1.20",
             "compileSdkVersion": 35,
-            "targetSdkVersion": 35
+            "targetSdkVersion": 35,
+            "buildToolsVersion": "35.0.0",
+            "minSdkVersion": 24
           }
         }
       ]
@@ -59,12 +61,6 @@
       "eas": {
         "projectId": "1ab86178-046a-4e57-9bd7-94505216d86c"
       }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/1ab86178-046a-4e57-9bd7-94505216d86c"
     }
   }
 }

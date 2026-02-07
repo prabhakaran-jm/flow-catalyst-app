@@ -15,13 +15,16 @@ export default function Index() {
   const [loadingCatalysts, setLoadingCatalysts] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Redirect to sign-in if not authenticated
+  // Redirect to sign-in if not authenticated; refresh catalysts when screen gains focus
   useFocusEffect(
     useCallback(() => {
       if (!loading && !user) {
         router.replace('/signin');
+      } else if (user) {
+        // Refresh list when returning from create/edit (ensures new catalysts appear)
+        loadCatalysts();
       }
-    }, [user, loading, router])
+    }, [user, loading, router, loadCatalysts])
   );
 
   // Fetch catalysts when user is available
@@ -201,9 +204,18 @@ export default function Index() {
         <View style={styles.testNavButtons}>
           <TouchableOpacity 
             style={styles.testNavButton} 
-            onPress={() => router.push('/signin')}
+            onPress={async () => {
+              if (user) {
+                await signOut();
+                // Brief delay so auth state propagates before signin mounts (avoids redirect loop)
+                await new Promise((r) => setTimeout(r, 150));
+                router.replace('/signin');
+              } else {
+                router.push('/signin');
+              }
+            }}
           >
-            <Text style={styles.testNavButtonText}>Sign In</Text>
+            <Text style={styles.testNavButtonText}>{user ? 'Re-sign In' : 'Sign In'}</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.testNavButton} 
@@ -220,14 +232,18 @@ export default function Index() {
           <TouchableOpacity 
             style={[styles.testNavButton, catalysts.length === 0 && styles.testNavButtonDisabled]}
             onPress={() => {
-              if (catalysts.length > 0) {
+              if (catalysts.length === 0) return;
+              if (plan === 'free') {
+                router.push('/paywall');
+              } else {
                 router.push(`/catalyst/${catalysts[0].id}`);
               }
             }}
             disabled={catalysts.length === 0}
           >
             <Text style={styles.testNavButtonText}>
-              Run Catalyst{catalysts.length === 0 ? ' (create one first)' : ''}
+              Run Catalyst
+              {catalysts.length === 0 ? ' (create one first)' : plan === 'free' ? ' → Upgrade' : ''}
             </Text>
           </TouchableOpacity>
         </View>
@@ -237,12 +253,16 @@ export default function Index() {
             <TouchableOpacity 
               style={[styles.testNavButton, plan === 'free' && styles.testNavButtonActive]} 
               onPress={() => setPlanForTesting?.('free')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              activeOpacity={0.7}
             >
               <Text style={styles.testNavButtonText}>Set Free</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.testNavButton, plan === 'pro' && styles.testNavButtonActive]} 
               onPress={() => setPlanForTesting?.('pro')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              activeOpacity={0.7}
             >
               <Text style={styles.testNavButtonText}>Set Pro</Text>
             </TouchableOpacity>
