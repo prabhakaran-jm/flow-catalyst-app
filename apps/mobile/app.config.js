@@ -24,6 +24,7 @@ module.exports = {
     // Ensure flowcatalyst:// deep links open in app (magic link auth)
     android: {
       ...base.expo.android,
+      versionCode: base.expo.android?.versionCode ?? 2,
       intentFilters: [
         {
           action: 'VIEW',
