@@ -25,6 +25,8 @@ Before deploying, ensure you have:
 - [ ] All environment variables documented
 - [ ] Database migrations tested locally
 - [ ] Edge Functions tested locally
+- [ ] Store assets ready (screenshots, feature graphic, descriptions, privacy policy) — see [store-assets/README.md](store-assets/README.md)
+- [ ] Privacy policy and terms of service ready — see [legal/README.md](legal/README.md)
 
 ---
 

@@ -78,4 +78,4 @@ Use a **preview** EAS build (`eas build --profile preview`):
 - Tap **Set Pro** to unlock all features
 - No RevenueCat products required
 
-For server-side rate limit bypass without RevenueCat, set `profiles.plan = 'pro'` in the database.
+**Set Pro + Custom Coach:** When using preview builds with **Set Pro**, the app sends `X-Test-Pro: true`. Set `ALLOW_TEST_PLAN_OVERRIDE=true` in Supabase Edge Function secrets so the server bypasses the rate limit. (Without this, you must manually set `profiles.plan = 'pro'` in the database.)

@@ -13,6 +13,14 @@ module.exports = {
   ...base,
   expo: {
     ...base.expo,
+    // iOS: Declare standard/exempt encryption (no custom crypto)
+    ios: {
+      ...base.expo.ios,
+      infoPlist: {
+        ...base.expo.ios?.infoPlist,
+        ITSAppUsesNonExemptEncryption: false,
+      },
+    },
     // Ensure flowcatalyst:// deep links open in app (magic link auth)
     android: {
       ...base.expo.android,

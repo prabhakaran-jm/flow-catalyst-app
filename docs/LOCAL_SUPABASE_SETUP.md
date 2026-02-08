@@ -51,7 +51,9 @@ In a **separate terminal**, from the **project root** (not apps/mobile), run:
 npx supabase functions serve create-catalyst run-catalyst refine --no-verify-jwt --env-file .env
 ```
 
-Ensure your `.env` contains `ALLOW_DEV_AUTH_BYPASS=true` for local testing.
+Ensure your `.env` contains:
+- `ALLOW_DEV_AUTH_BYPASS=true` for local testing
+- `ALLOW_TEST_PLAN_OVERRIDE=true` so Set Pro bypasses the daily run limit when testing custom coaches
 
 Or to serve all functions:
 

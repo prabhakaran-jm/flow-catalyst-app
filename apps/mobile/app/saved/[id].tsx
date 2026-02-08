@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
@@ -13,6 +14,7 @@ import { normalizeRefineOutput } from '@/src/lib/formatOutput';
 export default function SavedDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { savedResults, loadSavedResults, deleteSavedResult } = useAppStore();
   const [copied, setCopied] = React.useState(false);
   const [hasLoaded, setHasLoaded] = React.useState(false);
@@ -69,7 +71,7 @@ export default function SavedDetailScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: 80 + theme.spacing.xl * 2 + insets.bottom }]}>
       <View style={styles.header}>
         <Text style={styles.coachName}>{result.coachTitle}</Text>
         <Text style={styles.date}>{new Date(result.createdAt).toLocaleString()}</Text>

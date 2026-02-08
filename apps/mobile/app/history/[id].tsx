@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import * as Clipboard from 'expo-clipboard';
@@ -6,12 +7,14 @@ import { Share } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/theme';
+import { normalizeRefineOutput } from '@/src/lib/formatOutput';
 import { fetchSavedRun, deleteSavedRun, SavedRun } from '@/src/lib/api';
 import { showAlert, showConfirm } from '@/src/lib/alert';
 
 export default function HistoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [run, setRun] = useState<SavedRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -63,22 +66,14 @@ export default function HistoryDetailScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: 80 + theme.spacing.xl * 2 + insets.bottom }]}>
       <View style={styles.header}>
         <Text style={styles.coachName}>{run.coach_name}</Text>
         <Text style={styles.date}>{new Date(run.created_at).toLocaleString()}</Text>
       </View>
 
       <View style={styles.outputContainer}>
-        <Markdown>
-          {run.output
-            .replace(/([^\n\r])##/g, '$1\n\n##')
-            .replace(/##([^\s#\n])/g, '## $1')
-            .replace(/([^\n\r])-\s/g, '$1\n- ')
-            .replace(/([^\n\r])(\d+\.\s)/g, '$1\n$2')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim()}
-        </Markdown>
+        <Markdown>{normalizeRefineOutput(run.output)}</Markdown>
       </View>
 
       <View style={styles.actions}>

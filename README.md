@@ -207,6 +207,7 @@ eas build --platform android
 - `SUPABASE_SERVICE_ROLE_KEY`: Service role key (keep secret!)
 - `DAILY_RUN_LIMIT`: Free tier runs per day (default: 3)
 - `ALLOW_DEV_AUTH_BYPASS`: Set to `true` only for local dev (ES256 JWT workaround). **Never set in production.**
+- `ALLOW_TEST_PLAN_OVERRIDE`: Set to `true` for preview builds so Set Pro bypasses server-side rate limit. **Never set in production.**
 
 ## RevenueCat Setup (Required for Paywall)
 

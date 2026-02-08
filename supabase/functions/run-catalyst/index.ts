@@ -6,7 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-test-pro',
 };
 
 interface RunCatalystRequest {
@@ -23,6 +23,22 @@ interface RunCatalystResponse {
   output: string;
   promptDebug: string;
 }
+
+// Same output structure as built-in coaches - ensures consistent formatting (## headings, no Roman numeral/bold edge cases)
+const OUTPUT_INSTRUCTIONS = `
+Respond in this structure:
+## Summary
+(1-2 sentences)
+
+## Output
+(main content)
+
+## Steps
+(numbered list)
+
+## Do this now
+(One concrete action to take immediately)
+`;
 
 /**
  * Call AI API to generate output from prompt
@@ -305,7 +321,7 @@ serve(async (req) => {
         prompt = prompt.replace(new RegExp(placeholder1.replace(/[{}]/g, '\\$&'), 'g'), stringValue);
         prompt = prompt.replace(new RegExp(placeholder2.replace(/[{}]/g, '\\$&'), 'g'), stringValue);
       }
-      prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis, - for bullets. Ensure headings start with ## on a new line with a space after ##. Be scannable.]`;
+      prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis (no space inside asterisks—use **text** not ** text **), - for bullets. Ensure headings start with ## on a new line with a space after ##. Do NOT indent lines with 4+ spaces (that creates code blocks). Use regular - bullets at column 0. Be scannable.]`;
       const promptDebug = `Built-in: ${built_in.id}\nInputs: ${JSON.stringify(inputs, null, 2)}\n\nFinal Prompt:\n${prompt}`;
       try {
         const aiOutput = await callAI(prompt);
@@ -439,7 +455,10 @@ serve(async (req) => {
     }
 
     // Server-side rate limit: 3 runs/day for free tier; Pro users bypass
-    const isPro = profile?.plan === 'pro';
+    // When ALLOW_TEST_PLAN_OVERRIDE=true (preview builds), honor X-Test-Pro header from Set Pro
+    const allowTestOverride = Deno.env.get('ALLOW_TEST_PLAN_OVERRIDE') === 'true';
+    const xTestPro = req.headers.get('X-Test-Pro') === 'true';
+    const isPro = profile?.plan === 'pro' || (allowTestOverride && xTestPro);
     if (!isPro) {
       const today = new Date().toISOString().slice(0, 10);
       const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -488,8 +507,11 @@ serve(async (req) => {
       }
     }
 
+    // Use same structured output as built-in coaches for consistent formatting
+    prompt += OUTPUT_INSTRUCTIONS;
+
     // Mobile-friendly output instructions
-    prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis, - for bullets. Ensure headings start with ## on a new line with a space after ##. Be scannable.]`;
+    prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis (no space inside asterisks—use **text** not ** text **), - for bullets. Ensure headings start with ## on a new line with a space after ##. Do NOT indent lines with 4+ spaces (that creates code blocks). Use regular - bullets at column 0. Be scannable.]`;
 
     // Build debug string for troubleshooting
     const promptDebug = [

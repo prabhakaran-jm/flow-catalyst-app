@@ -56,9 +56,12 @@ async function getAccessToken(): Promise<string> {
 export async function runCatalyst({
   catalystId,
   inputs,
+  /** When true (Set Pro + skipRevenueCat), server bypasses rate limit for testing */
+  xTestPro,
 }: {
   catalystId: string;
   inputs: Record<string, any>;
+  xTestPro?: boolean;
 }): Promise<{ output: string; promptDebug: string }> {
   const accessToken = await getAccessToken();
   const baseUrl = getEdgeFunctionBaseUrl();
@@ -67,12 +70,17 @@ export async function runCatalyst({
   console.log('Catalyst ID:', catalystId);
   console.log('Inputs:', inputs);
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+  };
+  if (xTestPro) {
+    headers['X-Test-Pro'] = 'true';
+  }
+
   const response = await fetch(`${baseUrl}/run-catalyst`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers,
     body: JSON.stringify({
       catalyst_id: catalystId,
       inputs,

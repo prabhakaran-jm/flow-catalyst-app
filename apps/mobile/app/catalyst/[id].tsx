@@ -13,6 +13,7 @@ import {
   findNodeHandle,
   UIManager,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -42,6 +43,7 @@ function getBuiltInIdFromParam(id: string): BuiltInCoachId | null {
 export default function CatalystDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { loading: authLoading, user } = useSupabase();
   const { plan } = useRevenueCat();
   const { anonymousRunsUsed, loadAnonymousRunsUsed, incrementAnonymousRunsUsed, hasSeenProfileNudge, setHasSeenProfileNudge, loadHasSeenProfileNudge, loadSavedResults, saveResult } = useAppStore();
@@ -296,7 +298,14 @@ export default function CatalystDetail() {
           maybeShowProfileNudge();
         }
       } else if (catalyst) {
-        const result = await runCatalyst({ catalystId: id, inputs });
+        // Send X-Test-Pro when user has Set Pro (server honors only when ALLOW_TEST_PLAN_OVERRIDE=true)
+        const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
+        const showTestNav = __DEV__ || skipRevenueCat || Constants.expoConfig?.extra?.showTestNav;
+        const result = await runCatalyst({
+          catalystId: id,
+          inputs,
+          xTestPro: plan === 'pro' && !!showTestNav,
+        });
         setOutput(result.output);
         setPromptDebug(result.promptDebug);
         if (user && !hasSeenProfileNudge) {
@@ -424,7 +433,12 @@ export default function CatalystDetail() {
   const isRunDisabled = loading || !hasRequiredInputs || mustUpgrade || showLimitWarning;
 
   const content = (
-    <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      ref={scrollViewRef}
+      style={styles.scrollView}
+      contentContainerStyle={[styles.content, { paddingBottom: (output ? 80 : 0) + theme.spacing.xl * 2 + insets.bottom }]}
+      keyboardShouldPersistTaps="handled"
+    >
       {!output && (
         <View style={styles.progressStepper}>
           <View style={[styles.progressDot, styles.progressDotActive]} />
@@ -854,6 +868,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
   },
   resultActions: {
     flexDirection: 'row',
