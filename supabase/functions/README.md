@@ -29,6 +29,29 @@ Executes a catalyst with provided inputs and returns output.
 
 **AI Integration**: Uses OpenAI (default) or Anthropic to generate responses. See `AI_INTEGRATION_SETUP.md` for configuration.
 
+### refine-coach
+Coaching-focused refinement for built-in coaches. Returns refined inputs and optional clarifying questions.
+
+**Endpoint**: `POST /functions/v1/refine-coach`
+
+**Request Body**:
+```json
+{
+  "builtInId": "hook",
+  "inputs": { "topic": "...", "context": "..." }
+}
+```
+
+**Response**:
+```json
+{
+  "refinedInputs": { "topic": "...", "context": "..." },
+  "questions": [{"id": "q1", "text": "Short question?", "field": "topic"}]
+}
+```
+
+No auth required (anonymous calls allowed).
+
 ### create-catalyst
 Creates a new catalyst for the authenticated user.
 

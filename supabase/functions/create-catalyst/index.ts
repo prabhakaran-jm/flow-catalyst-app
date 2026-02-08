@@ -89,12 +89,16 @@ serve(async (req) => {
       user = result.data.user;
       authError = result.error;
     } catch (err) {
-      // Local Supabase ES256 JWT verification workaround
-      // Decode JWT payload without verification (for local dev only)
+      const allowDevBypass = Deno.env.get('ALLOW_DEV_AUTH_BYPASS') === 'true';
+      if (!allowDevBypass) {
+        return new Response(
+          JSON.stringify({ error: 'Auth required.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      // Local Supabase ES256 JWT verification workaround (dev only)
       console.log('[create-catalyst] getUser failed (likely ES256 issue), trying JWT decode workaround...');
-      
       try {
-        // Decode JWT payload (base64 decode, no verification)
         const parts = token.split('.');
         if (parts.length === 3) {
           const payload = JSON.parse(
@@ -102,19 +106,10 @@ serve(async (req) => {
               Uint8Array.from(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))
             )
           );
-          
-          // Extract user ID from payload
           const userId = payload.sub;
           const userEmail = payload.email;
-          
           if (userId) {
-            // For local dev: Create user object from JWT payload
-            // In production, this should use proper JWT verification
-            user = {
-              id: userId,
-              email: userEmail || undefined,
-              // Add other fields from payload if needed
-            } as any;
+            user = { id: userId, email: userEmail || undefined } as any;
             console.log('JWT decode workaround succeeded for user:', userId);
           } else {
             authError = { message: 'Invalid JWT payload: missing sub claim' };
@@ -124,20 +119,13 @@ serve(async (req) => {
         }
       } catch (decodeErr) {
         console.error('JWT decode workaround failed:', decodeErr);
-        authError = { 
-          message: `JWT verification failed: ${err?.message || String(err)}. Decode workaround also failed: ${decodeErr?.message || String(decodeErr)}` 
-        };
+        authError = { message: 'JWT verification failed' };
       }
     }
 
     if (authError || !user) {
-      console.error('Auth error:', authError);
       return new Response(
-        JSON.stringify({ 
-          error: 'Unauthorized', 
-          details: authError?.message || 'Failed to verify authentication token',
-          hint: 'This is a known issue with local Supabase ES256 JWT verification. Try using production Supabase or sign in again.'
-        }),
+        JSON.stringify({ error: 'Auth required.' }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

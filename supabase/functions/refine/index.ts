@@ -71,6 +71,19 @@ async function callAI(prompt: string): Promise<string> {
   throw new Error(`Unsupported AI_PROVIDER: ${aiProvider}. Use openrouter or gemini.`);
 }
 
+/** Force line breaks so content doesn't return as one long line */
+function forceLineBreaks(text: string): string {
+  return text
+    .replace(/([^\n\r])##/g, '$1\n\n##')
+    .replace(/##([^\s#\n])/g, '## $1')
+    .replace(/([^\n\r])-\s/g, '$1\n- ')
+    .replace(/([^\n\r])(\d+\.\s)/g, '$1\n$2')
+    .replace(/([.!?])\s+([A-Z])/g, '$1\n\n$2')
+    .replace(/([.!?])([A-Z])/g, '$1\n\n$2')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -99,7 +112,12 @@ ${userPrompt}
 ---
 
 Respond with ONLY the refined text. Do not include the instruction, labels, or any preamble. Output the refined text directly.
-Use line breaks between paragraphs. Use bullet points (-) for lists. Keep each line readable and on its own.`;
+
+CRITICAL FORMATTING:
+- Put each bullet point on its own line (start with - )
+- Put each numbered item on its own line (1. 2. 3.)
+- Put each paragraph on its own line (blank line between paragraphs)
+- Use actual newlines - do NOT output everything on a single line`;
 
     let suggestion = (await callAI(fullPrompt)).trim();
     // Strip common AI artifacts: markdown code blocks, leading/trailing quotes
@@ -107,7 +125,7 @@ Use line breaks between paragraphs. Use bullet points (-) for lists. Keep each l
     if ((suggestion.startsWith('"') && suggestion.endsWith('"')) || (suggestion.startsWith("'") && suggestion.endsWith("'"))) {
       suggestion = suggestion.slice(1, -1);
     }
-    suggestion = suggestion.trim();
+    suggestion = forceLineBreaks(suggestion.trim());
 
     return new Response(
       JSON.stringify({ suggestion } satisfies RefineResponse),

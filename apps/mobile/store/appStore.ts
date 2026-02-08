@@ -3,6 +3,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ANONYMOUS_RUNS_KEY = '@flow_catalyst:anonymous_runs_used';
 const PROFILE_NUDGE_KEY = '@flow_catalyst:profile_nudge_seen';
+const SAVED_RESULTS_KEY = 'saved_results';
+
+export interface SavedResult {
+  id: string;
+  coachId: string;
+  coachTitle: string;
+  output: string;
+  createdAt: string;
+  inputs: Record<string, any>;
+  leverValue?: number;
+}
 
 interface AppState {
   hasCompletedOnboarding: boolean;
@@ -13,6 +24,10 @@ interface AppState {
   hasSeenProfileNudge: boolean;
   setHasSeenProfileNudge: () => Promise<void>;
   loadHasSeenProfileNudge: () => Promise<void>;
+  savedResults: SavedResult[];
+  loadSavedResults: () => Promise<void>;
+  saveResult: (result: Omit<SavedResult, 'id' | 'createdAt'>) => Promise<SavedResult>;
+  deleteSavedResult: (id: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -41,5 +56,29 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadHasSeenProfileNudge: async () => {
     const v = await AsyncStorage.getItem(PROFILE_NUDGE_KEY);
     set({ hasSeenProfileNudge: v === '1' });
+  },
+  savedResults: [],
+  loadSavedResults: async () => {
+    try {
+      const raw = await AsyncStorage.getItem(SAVED_RESULTS_KEY);
+      const list: SavedResult[] = raw ? JSON.parse(raw) : [];
+      set({ savedResults: list });
+    } catch {
+      set({ savedResults: [] });
+    }
+  },
+  saveResult: async (result) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const createdAt = new Date().toISOString();
+    const full: SavedResult = { ...result, id, createdAt };
+    const next = [full, ...get().savedResults];
+    await AsyncStorage.setItem(SAVED_RESULTS_KEY, JSON.stringify(next));
+    set({ savedResults: next });
+    return full;
+  },
+  deleteSavedResult: async (id) => {
+    const next = get().savedResults.filter((r) => r.id !== id);
+    await AsyncStorage.setItem(SAVED_RESULTS_KEY, JSON.stringify(next));
+    set({ savedResults: next });
   },
 }));

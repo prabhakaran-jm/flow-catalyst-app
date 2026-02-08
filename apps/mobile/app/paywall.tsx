@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { theme } from '@/theme';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
@@ -21,16 +21,51 @@ const FEATURES = [
   'Create custom coaches',
 ];
 
+type PackageOption = { pkg: import('react-native-purchases').PurchasesPackage; title: string; period: string };
+
+function getPackageOptions(packages: import('react-native-purchases').PurchasesPackage[]): PackageOption[] {
+  const options: PackageOption[] = [];
+  const annual = packages.find(p => p.identifier.toLowerCase().includes('annual') || p.identifier.toLowerCase().includes('yearly'));
+  const monthly = packages.find(p => p.identifier.toLowerCase().includes('monthly'));
+  if (annual) options.push({ pkg: annual, title: 'Yearly', period: '/year' });
+  if (monthly) options.push({ pkg: monthly, title: 'Monthly', period: '/month' });
+  return options;
+}
+
 export default function Paywall() {
   const router = useRouter();
-  const { purchasePro, restorePurchases, plan } = useRevenueCat();
+  const { offerings, loadingOfferings, fetchOfferings, purchasePackage, restorePurchases, plan } = useRevenueCat();
   const [loadingStart, setLoadingStart] = useState(false);
   const [loadingRestore, setLoadingRestore] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const packageOptions = useMemo(() => {
+    const current = offerings?.current;
+    if (!current?.availablePackages?.length) return [];
+    return getPackageOptions(current.availablePackages);
+  }, [offerings]);
+
+  useEffect(() => {
+    fetchOfferings();
+  }, [fetchOfferings]);
+
+  useEffect(() => {
+    if (packageOptions.length > 0) {
+      const yearlyIdx = packageOptions.findIndex(o => o.period === '/year');
+      setSelectedIndex(yearlyIdx >= 0 ? yearlyIdx : 0);
+    }
+  }, [packageOptions.length]);
+
+  const selectedPackage = packageOptions[selectedIndex]?.pkg;
 
   const handleStartPro = async () => {
     try {
       setLoadingStart(true);
-      await purchasePro();
+      if (selectedPackage) {
+        await purchasePackage(selectedPackage);
+      } else {
+        throw new Error('No package selected');
+      }
       Alert.alert('Success', 'Subscription activated!', [
         { text: 'OK', onPress: () => router.back() },
       ]);
@@ -56,20 +91,20 @@ export default function Paywall() {
       Alert.alert('Success', 'Purchase restored!', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } catch (error) {
+    } catch {
       Alert.alert('Restore Failed', 'No active subscription found.');
     } finally {
       setLoadingRestore(false);
     }
   };
 
+  const hasOfferings = packageOptions.length > 0;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Go Pro</Text>
-        <Text style={styles.subtitle}>
-          Build momentum without limits.
-        </Text>
+        <Text style={styles.subtitle}>Build momentum without limits.</Text>
       </View>
 
       <View style={styles.features}>
@@ -80,10 +115,48 @@ export default function Paywall() {
         ))}
       </View>
 
+      {loadingOfferings ? (
+        <View style={styles.pricingLoading}>
+          <ActivityIndicator size="small" color={theme.colors.accent} />
+          <Text style={styles.pricingLoadingText}>Loading pricing…</Text>
+        </View>
+      ) : !hasOfferings ? (
+        <Text style={styles.pricingFallback}>Pricing not available yet.</Text>
+      ) : (
+        <View style={styles.packageOptions}>
+          {packageOptions.map((opt, idx) => {
+            const product = opt.pkg.product;
+            const priceString = product?.priceString ?? '';
+            const pricePerMonth = opt.period === '/year' ? product?.pricePerMonthString : null;
+            const isSelected = selectedIndex === idx;
+            return (
+              <TouchableOpacity
+                key={opt.pkg.identifier}
+                style={[styles.packageOption, isSelected && styles.packageOptionSelected]}
+                onPress={() => setSelectedIndex(idx)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.packageOptionContent}>
+                  <Text style={styles.packageTitle}>{opt.title}</Text>
+                  <Text style={styles.packagePrice}>
+                    {priceString}
+                    <Text style={styles.packagePeriod}>{opt.period}</Text>
+                  </Text>
+                  {pricePerMonth && (
+                    <Text style={styles.packagePerMonth}>{pricePerMonth} / month</Text>
+                  )}
+                </View>
+                {isSelected && <View style={styles.packageCheck} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       <TouchableOpacity
-        style={[styles.primaryButton, loadingStart && styles.buttonDisabled]}
+        style={[styles.primaryButton, (loadingStart || !hasOfferings || plan === 'pro') && styles.buttonDisabled]}
         onPress={handleStartPro}
-        disabled={loadingStart || plan === 'pro'}
+        disabled={loadingStart || !hasOfferings || plan === 'pro'}
       >
         {loadingStart ? (
           <ActivityIndicator color={theme.colors.background} />
@@ -153,6 +226,73 @@ const styles = StyleSheet.create({
   featureText: {
     ...theme.typography.body,
     color: theme.colors.text,
+  },
+  pricingLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  pricingLoadingText: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+  },
+  pricingFallback: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    paddingVertical: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  packageOptions: {
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+  },
+  packageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.background,
+  },
+  packageOptionSelected: {
+    borderColor: theme.colors.accent,
+    borderWidth: 2,
+    backgroundColor: theme.colors.accentLightBackground,
+  },
+  packageOptionContent: {
+    flex: 1,
+  },
+  packageTitle: {
+    ...theme.typography.body,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  packagePrice: {
+    ...theme.typography.body,
+    color: theme.colors.text,
+    marginTop: 2,
+  },
+  packagePeriod: {
+    color: theme.colors.textSecondary,
+    fontWeight: '400',
+  },
+  packagePerMonth: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  packageCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.accent,
+    marginLeft: theme.spacing.sm,
   },
   primaryButton: {
     backgroundColor: theme.colors.accent,

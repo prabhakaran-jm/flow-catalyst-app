@@ -4,8 +4,12 @@ export type Plan = 'free' | 'pro';
 
 interface RevenueCatContextType {
   plan: Plan;
+  offerings: { current: unknown } | null;
+  loadingOfferings: boolean;
   refreshEntitlements: () => Promise<void>;
+  fetchOfferings: () => Promise<void>;
   purchasePro: () => Promise<void>;
+  purchasePackage: (pkg: unknown) => Promise<void>;
   restorePurchases: () => Promise<void>;
   setPlanForTesting?: (plan: Plan) => void;
 }
@@ -36,6 +40,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     );
   };
 
+  const purchasePackage = async (): Promise<void> => {
+    throw new Error(
+      'Purchases are only available in the store version. Install from Play Store to subscribe.'
+    );
+  };
+
   const restorePurchases = async (): Promise<void> => {
     throw new Error('Restore is only available in the store version.');
   };
@@ -47,8 +57,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   const value: RevenueCatContextType = {
     plan,
+    offerings: null,
+    loadingOfferings: false,
     refreshEntitlements,
+    fetchOfferings: async () => {},
     purchasePro,
+    purchasePackage,
     restorePurchases,
     setPlanForTesting,
   };

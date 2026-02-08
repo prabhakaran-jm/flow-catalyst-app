@@ -31,10 +31,10 @@ export default function EditCatalyst() {
 
   const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
   useEffect(() => {
-    if (!authLoading && user && plan === 'free' && !skipRevenueCat) {
+    if (!authLoading && user && plan === 'free') {
       router.replace('/paywall');
     }
-  }, [plan, authLoading, user, router, skipRevenueCat]);
+  }, [plan, authLoading, user, router]);
 
   useEffect(() => {
     const load = async () => {

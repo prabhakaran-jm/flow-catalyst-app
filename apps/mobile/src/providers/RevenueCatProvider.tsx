@@ -24,8 +24,14 @@ export type Plan = 'free' | 'pro';
 
 interface RevenueCatContextType {
   plan: Plan;
+  /** Current offering (packages). Null when skipped or not yet loaded. */
+  offerings: { current: PurchasesOffering | null } | null;
+  loadingOfferings: boolean;
   refreshEntitlements: () => Promise<void>;
+  fetchOfferings: () => Promise<void>;
   purchasePro: () => Promise<void>;
+  /** Purchase a specific package (used by paywall for selected option). */
+  purchasePackage: (pkg: PurchasesPackage) => Promise<void>;
   restorePurchases: () => Promise<void>;
   setPlanForTesting?: (plan: Plan) => void; // For testing only
 }
@@ -52,6 +58,8 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   const [plan, setPlan] = useState<Plan>('free');
   const [testingOverride, setTestingOverride] = useState<Plan | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [offerings, setOfferings] = useState<{ current: PurchasesOffering | null } | null>(null);
+  const [loadingOfferings, setLoadingOfferings] = useState(false);
 
   // Initialize RevenueCat SDK (skip when sideloaded - preview/dev builds not from Play Store)
   useEffect(() => {
@@ -139,48 +147,68 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   };
 
   /**
+   * Fetch current offerings (for paywall pricing display).
+   */
+  const fetchOfferings = async (): Promise<void> => {
+    const extra = Constants.expoConfig?.extra || {};
+    if (extra.skipRevenueCat) {
+      setOfferings(null);
+      setLoadingOfferings(false);
+      return;
+    }
+    setLoadingOfferings(true);
+    try {
+      const result = await Purchases.getOfferings();
+      setOfferings(result);
+    } catch (error) {
+      console.error('Failed to fetch offerings:', error);
+      setOfferings(null);
+    } finally {
+      setLoadingOfferings(false);
+    }
+  };
+
+  /**
+   * Purchase a specific package (used by paywall for selected option).
+   */
+  const purchasePackage = async (pkg: PurchasesPackage): Promise<void> => {
+    try {
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
+      const isPro = customerInfo.entitlements.active['pro'] !== undefined;
+      setPlan(isPro ? 'pro' : 'free');
+      if (!isPro) {
+        throw new Error('Purchase completed but pro entitlement not active');
+      }
+    } catch (error: any) {
+      if (error.userCancelled) {
+        throw new Error('Purchase cancelled');
+      }
+      throw error;
+    }
+  };
+
+  /**
    * Purchase Pro subscription
    * Attempts to purchase the first available package from current offerings
    */
   const purchasePro = async (): Promise<void> => {
     try {
-      const offerings: PurchasesOffering | null = await Purchases.getOfferings();
-      
-      if (!offerings?.current) {
+      const result = await Purchases.getOfferings();
+      if (!result?.current) {
         throw new Error('No offerings available');
       }
-
-      // Try to find a package (you can customize this logic)
-      // Common identifiers: '$rc_monthly', '$rc_annual', etc.
-      let packageToPurchase: PurchasesPackage | null = null;
-
-      // Prefer annual, then monthly
-      packageToPurchase = 
-        offerings.current.availablePackages.find(pkg => pkg.identifier.includes('annual')) ||
-        offerings.current.availablePackages.find(pkg => pkg.identifier.includes('monthly')) ||
-        offerings.current.availablePackages[0]; // Fallback to first available
-
+      const packageToPurchase =
+        result.current.availablePackages.find(pkg => pkg.identifier.includes('annual')) ||
+        result.current.availablePackages.find(pkg => pkg.identifier.includes('monthly')) ||
+        result.current.availablePackages[0];
       if (!packageToPurchase) {
         throw new Error('No packages available for purchase');
       }
-
-      // Make the purchase
-      const { customerInfo } = await Purchases.purchasePackage(packageToPurchase);
-      
-      // Update plan based on entitlements
-      const isPro = customerInfo.entitlements.active['pro'] !== undefined;
-      setPlan(isPro ? 'pro' : 'free');
-
-      if (!isPro) {
-        throw new Error('Purchase completed but pro entitlement not active');
-      }
+      await purchasePackage(packageToPurchase);
     } catch (error: any) {
-      // Handle user cancellation gracefully
       if (error.userCancelled) {
         throw new Error('Purchase cancelled');
       }
-      
-      // Re-throw other errors
       throw error;
     }
   };
@@ -206,8 +234,12 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   const value: RevenueCatContextType = {
     plan: testingOverride ?? plan,
+    offerings,
+    loadingOfferings,
     refreshEntitlements,
+    fetchOfferings,
     purchasePro,
+    purchasePackage,
     restorePurchases,
     setPlanForTesting,
   };

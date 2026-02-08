@@ -1,6 +1,22 @@
 # Flow Catalyst
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Expo](https://img.shields.io/badge/Expo-SDK%2054-000020.svg?logo=expo)](https://expo.dev)
+[![React Native](https://img.shields.io/badge/React%20Native-0.81-61DAFB.svg?logo=react)](https://reactnative.dev)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%26%20Edge%20Functions-3ECF8E.svg?logo=supabase)](https://supabase.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg?logo=typescript)](https://www.typescriptlang.org)
+[![pnpm](https://img.shields.io/badge/pnpm-9.0-orange.svg?logo=pnpm)](https://pnpm.io)
+
 Flow Catalyst is a minimalist, mobile-first AI coaching app for productivity-focused creators. It uses focused "Action Catalysts" and AI to turn abstract advice into instant, repeatable actions, with subscriptions powered by RevenueCat.
+
+## Features
+
+- **Magic Wand** – AI refines your input in real-time before generating
+- **Value Levers** – Tune tone (Casual↔Formal, etc.) without writing prompts
+- **5 Built-in Coaches** – Hook, Outline, Block Breaker, Clarity, Decision
+- **Save & Library** – Save runs to history, browse past guidance
+- **OTP Auth** – Sign in with 8-digit code (no password)
+- **Free Tier** – 1 anonymous run, 3/day signed-in; Pro for unlimited + custom coaches
 
 ## Tech Stack
 
@@ -132,11 +148,15 @@ curl -X POST http://localhost:54321/functions/v1/run-catalyst \
 
 **429 Rate Limit (Gemini):** Free tier Gemini API keys have rate limits (~15 requests/minute). If you see "rate limit exceeded", wait 1-2 minutes between requests or upgrade your API key at https://aistudio.google.com/apikey
 
+**Server-side rate limiting:** Free users get 3 runs/day (configurable via `DAILY_RUN_LIMIT`). Pro users (`profiles.plan = 'pro'`) bypass the limit.
+
 ## Database Schema
 
 Key tables:
-- **profiles**: User profile information (domain, work_style, values)
+- **profiles**: User profile (domain, work_style, values, plan). `plan` = `free` or `pro` for server-side rate limit bypass
 - **catalysts**: Action Catalysts with prompts and input definitions
+- **catalyst_runs**: Run history (for rate limiting and analytics)
+- **saved_runs**: User-saved runs in Library
 
 Apply migrations with:
 ```bash
@@ -179,11 +199,14 @@ eas build --platform android
 - `SUPABASE_URL`: Your Supabase project URL
 - `SUPABASE_ANON_KEY`: Supabase anonymous/public key
 - `EDGE_FUNCTION_BASE_URL`: Base URL for Edge Functions (usually `{SUPABASE_URL}/functions/v1`)
+- `REVENUECAT_API_KEY_IOS` / `REVENUECAT_API_KEY_ANDROID`: For production builds (set in EAS secrets)
 
 ### Edge Functions (set in Supabase dashboard)
 
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY`: Service role key (keep secret!)
+- `DAILY_RUN_LIMIT`: Free tier runs per day (default: 3)
+- `ALLOW_DEV_AUTH_BYPASS`: Set to `true` only for local dev (ES256 JWT workaround). **Never set in production.**
 
 ## RevenueCat Setup (Required for Paywall)
 
@@ -214,21 +237,16 @@ While waiting for Play Store / App Store developer activation:
 
 ## Testing & Deployment
 
-- **Quick Start**: See `QUICK_START.md` for immediate testing steps
-- **Testing Guide**: See `STEP_BY_STEP_TESTING.md` for detailed testing walkthrough
-- **Deployment Guide**: See `DEPLOYMENT_GUIDE.md` for production deployment
-- **Testing Checklist**: See `TESTING_CHECKLIST.md` for comprehensive test cases
-
-## Troubleshooting
-
-- **Enable magic link (click-to-sign-in)**: See `docs/AUTH_EMAIL_TROUBLESHOOTING.md` — deploy web app, set `AUTH_REDIRECT_WEB_URL`, add redirect URL in Supabase.
-- **"Error sending confirmation email"**: See `docs/AUTH_EMAIL_TROUBLESHOOTING.md` for SMTP setup and rate limits.
+- **Quick Start**: See `docs/QUICK_START.md` for immediate testing steps
+- **Testing Guide**: See `docs/STEP_BY_STEP_TESTING.md` for detailed testing walkthrough
+- **Deployment Guide**: See `docs/DEPLOYMENT_GUIDE.md` for production deployment
+- **Testing Checklist**: See `docs/TESTING_CHECKLIST.md` for comprehensive test cases
 
 ## Setup Guides
 
-- **Local Supabase**: See `LOCAL_SUPABASE_SETUP.md`
-- **AI Integration**: See `AI_INTEGRATION_SETUP.md`
-- **RevenueCat**: See `REVENUECAT_SETUP.md`
+- **Local Supabase**: See `docs/LOCAL_SUPABASE_SETUP.md`
+- **AI Integration**: See `docs/AI_INTEGRATION_SETUP.md`
+- **RevenueCat**: See `docs/REVENUECAT_SETUP.md` for entitlement, offerings, and product setup
 
 ## License
 

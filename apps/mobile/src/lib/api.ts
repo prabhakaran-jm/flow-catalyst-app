@@ -109,6 +109,43 @@ export async function runCatalyst({
 }
 
 /**
+ * Refine built-in coach inputs with coaching-focused AI. Returns refined inputs and optional clarifying questions.
+ */
+export interface RefineCoachQuestion {
+  id: string;
+  text: string;
+  field: string;
+}
+
+export interface RefineCoachResult {
+  refinedInputs: Record<string, string>;
+  questions?: RefineCoachQuestion[];
+}
+
+export async function refineBuiltInCoach({
+  builtInId,
+  inputs,
+}: {
+  builtInId: string;
+  inputs: Record<string, string>;
+}): Promise<RefineCoachResult> {
+  const baseUrl = getEdgeFunctionBaseUrl();
+
+  const response = await fetch(`${baseUrl}/refine-coach`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ builtInId, inputs }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    throw new Error(errorData.error || `Refine failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
  * Run a built-in coach (no auth required for anonymous users)
  */
 export async function runBuiltInCoach({

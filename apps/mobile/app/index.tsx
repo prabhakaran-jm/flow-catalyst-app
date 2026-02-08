@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/theme';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
+import { useAppStore } from '@/store/appStore';
 import { fetchCatalysts, deleteCatalyst, Catalyst } from '@/src/lib/api';
 import { showAlert, showConfirm } from '@/src/lib/alert';
 import { BUILT_IN_COACHES, type BuiltInCoachId } from '@/src/lib/coaches';
@@ -43,6 +44,7 @@ export default function Index() {
   const insets = useSafeAreaInsets();
   const { plan, setPlanForTesting } = useRevenueCat();
   const { user, loading, signOut } = useSupabase();
+  const { savedResults, loadSavedResults, deleteSavedResult } = useAppStore();
   const [catalysts, setCatalysts] = useState<Catalyst[]>([]);
   const [loadingCatalysts, setLoadingCatalysts] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,8 +65,9 @@ export default function Index() {
 
   useFocusEffect(
     useCallback(() => {
+      loadSavedResults();
       if (user) loadCatalysts();
-    }, [user, loadCatalysts])
+    }, [user, loadCatalysts, loadSavedResults])
   );
 
   const onRefresh = useCallback(async () => {
@@ -181,11 +184,11 @@ export default function Index() {
         <View style={styles.headerTop}>
           <Text style={styles.title}>Choose Your Coach</Text>
           <View style={styles.headerActions}>
+            <TouchableOpacity onPress={() => router.push('/saved' as any)} style={styles.profileButton}>
+              <Text style={styles.profileButtonText}>Saved</Text>
+            </TouchableOpacity>
             {user ? (
               <>
-                <TouchableOpacity onPress={() => router.push('/history')} style={styles.profileButton}>
-                  <Text style={styles.profileButtonText}>Library</Text>
-                </TouchableOpacity>
                 <TouchableOpacity onPress={() => router.push('/profile')} style={styles.profileButton}>
                   <Text style={styles.profileButtonText}>Profile</Text>
                 </TouchableOpacity>
@@ -256,6 +259,46 @@ export default function Index() {
         </View>
       </View>
 
+      {/* Saved results (local) */}
+      {savedResults.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Saved</Text>
+            {savedResults.length > 5 && (
+              <TouchableOpacity onPress={() => router.push('/saved' as any)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={styles.seeAllLink}>See all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {savedResults.slice(0, 5).map((r) => (
+            <TouchableOpacity
+              key={r.id}
+              style={styles.savedCard}
+              onPress={() => router.push(`/saved/${r.id}` as any)}
+              onLongPress={async () => {
+                const ok = await showConfirm('Delete', 'Remove this from saved?');
+                if (ok) await deleteSavedResult(r.id);
+              }}
+            >
+              <View style={styles.savedCardContent}>
+                <Text style={styles.savedTitle} numberOfLines={1}>{r.coachTitle}</Text>
+                <Text style={styles.savedDate}>{new Date(r.createdAt).toLocaleString()}</Text>
+              </View>
+              <TouchableOpacity
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={async (e) => {
+                  e.stopPropagation();
+                  const ok = await showConfirm('Delete', 'Remove this from saved?');
+                  if (ok) await deleteSavedResult(r.id);
+                }}
+              >
+                <Text style={styles.savedDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* User's coaches (only when signed in) */}
       {user && (
         <View style={styles.section}>
@@ -279,7 +322,7 @@ export default function Index() {
             <View style={styles.coachGrid}>
               {filteredCatalysts.map((catalyst) => {
                 const isOwner = user && catalyst.owner_id === user.id;
-                const canEditDelete = isOwner && catalyst.visibility !== 'system';
+                const canEditDelete = isOwner && catalyst.visibility !== 'system' && plan === 'pro';
                 return (
                   <TouchableOpacity
                     key={catalyst.id}
@@ -446,6 +489,8 @@ const styles = StyleSheet.create({
   },
   userEmail: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginTop: theme.spacing.xs },
   section: { marginBottom: theme.spacing.xl },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.md },
+  seeAllLink: { ...theme.typography.bodySmall, color: theme.colors.accent, fontWeight: '600' },
   sectionTitle: {
     ...theme.typography.h3,
     color: theme.colors.text,
@@ -474,6 +519,21 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     textAlign: 'center',
   },
+  savedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  savedCardContent: { flex: 1, marginRight: theme.spacing.sm },
+  savedTitle: { ...theme.typography.h3, color: theme.colors.text },
+  savedDate: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginTop: theme.spacing.xs },
+  savedDeleteText: { ...theme.typography.bodySmall, color: theme.colors.error, fontWeight: '600' },
   coachGrid: { gap: theme.spacing.md, marginBottom: theme.spacing.md },
   coachCard: {
     backgroundColor: theme.colors.background,

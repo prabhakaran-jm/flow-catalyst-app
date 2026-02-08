@@ -8,8 +8,19 @@ export class AISuggestionError extends Error {
   }
 }
 
+export type RefineFieldType = 'advice' | 'context' | 'name';
+
+const REFINE_INSTRUCT: Record<RefineFieldType, string> = {
+  advice:
+    'Refine this coaching advice to be more actionable. Put each bullet on its own line (start with -). Put each paragraph on its own line. Do NOT output everything on one line.',
+  context:
+    'Add specific target audience context to this description. Put each bullet on its own line (start with -). Put each paragraph on its own line. Do NOT output everything on one line.',
+  name:
+    'Suggest a short, catchy coach name (max 5–6 words). Output ONLY the name, nothing else. No bullets, no explanation.',
+};
+
 export const getRealAISuggestion = async (
-  fieldType: 'advice' | 'context',
+  fieldType: RefineFieldType,
   currentText: string
 ): Promise<string> => {
   const baseUrl = supabaseConfig.edgeFunctionBaseUrl;
@@ -36,16 +47,15 @@ export const getRealAISuggestion = async (
     headers['Authorization'] = `Bearer ${session.access_token}`;
   }
 
+  const instruct = REFINE_INSTRUCT[fieldType] ?? REFINE_INSTRUCT.advice;
+
   const response = await fetch(`${baseUrl}/refine`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
       prompt: currentText,
       type: fieldType,
-      instruct:
-        fieldType === 'advice'
-          ? 'Refine this coaching advice to be more actionable. Use line breaks between points. Use bullet points (-) for lists.'
-          : 'Add specific target audience context to this description. Use line breaks between points. Use bullet points (-) for lists.',
+      instruct,
     }),
   });
 

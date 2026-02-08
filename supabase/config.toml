@@ -148,3 +148,6 @@ verify_jwt = false
 
 [functions.refine]
 verify_jwt = false
+
+[functions.refine-coach]
+verify_jwt = false

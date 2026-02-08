@@ -10,35 +10,27 @@ import {
   Platform,
   Share,
   Vibration,
+  findNodeHandle,
+  UIManager,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Constants from 'expo-constants';
 import { theme } from '@/theme';
-import { runCatalyst, runBuiltInCoach, fetchCatalyst, deleteCatalyst, saveRun, fetchProfile, Catalyst } from '@/src/lib/api';
+import { runCatalyst, runBuiltInCoach, fetchCatalyst, deleteCatalyst, fetchProfile, Catalyst, refineBuiltInCoach, type RefineCoachQuestion } from '@/src/lib/api';
 import { showAlert, showConfirm, showAlertWithActions } from '@/src/lib/alert';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 import { useAppStore } from '@/store/appStore';
 import { getBuiltInCoach, type BuiltInCoachId } from '@/src/lib/coaches';
+import { normalizeRefineOutput } from '@/src/lib/formatOutput';
 import { getTodayRunCount, incrementRunCount, hasReachedDailyLimit } from '@/src/lib/runLimits';
 import Markdown from 'react-native-markdown-display';
 import MagicWandButton from '@/src/components/MagicWandButton';
-import { getRealAISuggestion } from '@/utils/ai-service';
 
 const BUILTIN_PREFIX = 'builtin-';
-
-function normalizeMarkdownOutput(text: string): string {
-  return text
-    .replace(/([^\n\r])##/g, '$1\n\n##')
-    .replace(/##([^\s#\n])/g, '## $1')
-    .replace(/([^\n\r])-\s/g, '$1\n- ')
-    .replace(/([^\n\r])(\d+\.\s)/g, '$1\n$2')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
 
 function getBuiltInIdFromParam(id: string): BuiltInCoachId | null {
   if (id?.startsWith(BUILTIN_PREFIX)) {
@@ -52,7 +44,7 @@ export default function CatalystDetail() {
   const router = useRouter();
   const { loading: authLoading, user } = useSupabase();
   const { plan } = useRevenueCat();
-  const { anonymousRunsUsed, loadAnonymousRunsUsed, incrementAnonymousRunsUsed, hasSeenProfileNudge, setHasSeenProfileNudge, loadHasSeenProfileNudge } = useAppStore();
+  const { anonymousRunsUsed, loadAnonymousRunsUsed, incrementAnonymousRunsUsed, hasSeenProfileNudge, setHasSeenProfileNudge, loadHasSeenProfileNudge, loadSavedResults, saveResult } = useAppStore();
 
   const builtInId = id ? getBuiltInIdFromParam(id) : null;
   const builtInCoach = builtInId ? getBuiltInCoach(builtInId) : null;
@@ -72,7 +64,14 @@ export default function CatalystDetail() {
   // Built-in coach: lever (0-100)
   const [leverValue, setLeverValue] = useState(50);
   const [isRefining, setIsRefining] = useState<string | null>(null);
+  const [refineQuestions, setRefineQuestions] = useState<RefineCoachQuestion[]>([]);
   const [feedbackHelpful, setFeedbackHelpful] = useState<'helpful' | 'not-helpful' | null>(null);
+  const [missingFieldName, setMissingFieldName] = useState<string | null>(null);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const slotRefsMap = useRef<Record<string, View | null>>({});
+  const inputRefsMap = useRef<Record<string, TextInput | null>>({});
+  const lastMagicWandTime = useRef<number>(0);
 
   const maybeShowProfileNudge = useCallback(async () => {
     try {
@@ -96,23 +95,72 @@ export default function CatalystDetail() {
     }
   }, [setHasSeenProfileNudge, router]);
 
+  const scrollToField = useCallback((fieldName: string) => {
+    const fieldRef = slotRefsMap.current[fieldName];
+    const scrollRef = scrollViewRef.current;
+    if (fieldRef && scrollRef) {
+      const fieldNode = findNodeHandle(fieldRef);
+      const scrollNode = findNodeHandle(scrollRef);
+      if (fieldNode && scrollNode) {
+        UIManager.measureLayout(fieldNode, scrollNode, () => {}, (x, y) => {
+          scrollRef.scrollTo({ y: Math.max(0, y - 40), animated: true });
+        });
+      }
+    }
+  }, []);
+
+  const MAGIC_WAND_COOLDOWN_MS = 5000;
+
   const handleMagicWandPress = useCallback(
-    async (field: string, fieldType: 'advice' | 'context') => {
-      if (fieldType !== 'advice' && fieldType !== 'context') return;
+    async (field: string) => {
+      if (!builtInId || !builtInCoach) return;
+      const now = Date.now();
+      if (now - lastMagicWandTime.current < MAGIC_WAND_COOLDOWN_MS) {
+        showAlert('Hold on', 'Wait a few seconds before refining again.');
+        return;
+      }
       if (Platform.OS !== 'web') Vibration.vibrate(10);
       setIsRefining(field);
-      const currentText = (inputs[field] ?? '').toString().trim();
+      lastMagicWandTime.current = now;
+      const builtInInputsStr: Record<string, string> = {};
+      builtInCoach.slots.forEach((s) => {
+        builtInInputsStr[s.name] = (inputs[s.name] ?? '').toString().trim();
+      });
       try {
-        const newText = await getRealAISuggestion(fieldType, currentText);
-        setInputs((prev) => ({ ...prev, [field]: newText }));
+        const { refinedInputs, questions } = await refineBuiltInCoach({
+          builtInId,
+          inputs: builtInInputsStr,
+        });
+        setInputs((prev) => {
+          const next = { ...prev };
+          builtInCoach.slots.forEach((s) => {
+            if (refinedInputs[s.name] !== undefined) next[s.name] = refinedInputs[s.name];
+          });
+          return next;
+        });
+        setRefineQuestions(questions ?? []);
       } catch (err) {
-        console.error('AI Magic Wand failed:', err);
-        showAlert('Refinement failed', err instanceof Error ? err.message : 'Please try again');
+        console.error('Magic Wand failed:', err);
+        showAlert('Refinement failed', err instanceof Error ? err.message : 'Try again');
       } finally {
         setIsRefining(null);
       }
     },
-    [inputs]
+    [builtInId, builtInCoach, inputs]
+  );
+
+  const handleQuestionTap = useCallback(
+    (q: RefineCoachQuestion) => {
+      scrollToField(q.field);
+      setInputs((prev) => {
+        const current = (prev[q.field] ?? '').toString().trim();
+        const suffix = current ? '\n\nAnswer: ' : 'Answer: ';
+        return { ...prev, [q.field]: current + suffix };
+      });
+      setRefineQuestions((prev) => prev.filter((x) => x.id !== q.id));
+      setTimeout(() => inputRefsMap.current[q.field]?.focus(), 400);
+    },
+    [scrollToField]
   );
 
   useEffect(() => {
@@ -155,13 +203,16 @@ export default function CatalystDetail() {
   const freeUserCanRun = plan === 'free' && !isProOnlyCoach;
   const mustUpgrade = plan === 'free' && isProOnlyCoach && !skipRevenueCat;
 
-
-  const validationPrompt = builtInCoach?.slots.find((s) => s.required && !(inputs[s.name] ?? '').toString().trim());
-
   const handleRun = async () => {
     if (!id) return;
     if (!hasRequiredInputs) {
-      showAlert('Fill required fields', validationPrompt ? validationPrompt.placeholder : 'Please fill in all required fields.');
+      if (isBuiltIn && builtInCoach) {
+        const firstMissing = builtInCoach.slots.find((s) => s.required && !(builtInInputs[s.name] ?? '').trim());
+        if (firstMissing) {
+          setMissingFieldName(firstMissing.name);
+          scrollToField(firstMissing.name);
+        }
+      }
       return;
     }
 
@@ -211,6 +262,7 @@ export default function CatalystDetail() {
     setError(null);
     setOutput(null);
     setPromptDebug(null);
+    setRefineQuestions([]);
 
     try {
       if (isBuiltIn && builtInCoach) {
@@ -272,26 +324,28 @@ export default function CatalystDetail() {
   };
 
   const handleSend = async () => {
-    if (output) {
-      await Share.share({ message: output, title: 'Guidance' });
-    }
+    if (!output) return;
+    await Share.share({ message: output });
   };
 
   const handleSave = async () => {
-    if (!user) {
-      showAlert('Sign in to save', 'Sign in to save and create your own coaches.');
-      router.push('/signin');
+    if (!output) return;
+    await loadSavedResults();
+    const count = useAppStore.getState().savedResults.length;
+    if (plan === 'free' && count >= 10) {
+      showAlert('Pro keeps everything.', 'Upgrade to save more.');
+      router.push('/paywall');
       return;
     }
-    if (!output) return;
     try {
-      await saveRun({
-        coachName: displayName,
+      await saveResult({
         coachId: id || '',
+        coachTitle: displayName,
         output,
         inputs: allInputs,
+        leverValue: isBuiltIn ? leverValue : undefined,
       });
-      showAlert('Saved', 'Added to your library.');
+      showAlert('Saved', 'Added to your saved results.');
     } catch (err) {
       showAlert('Save failed', err instanceof Error ? err.message : 'Please try again.');
     }
@@ -332,7 +386,7 @@ export default function CatalystDetail() {
   const displayName = builtInCoach?.title ?? catalyst?.name ?? '';
   const displayDesc = builtInCoach?.description ?? catalyst?.description ?? '';
 
-  const canEditDelete = catalyst && user?.id === catalyst.owner_id && catalyst.visibility !== 'system';
+  const canEditDelete = catalyst && user?.id === catalyst.owner_id && catalyst.visibility !== 'system' && plan === 'pro';
 
   const handleEdit = () => {
     if (id && catalyst) router.push(`/catalyst/${id}/edit`);
@@ -370,7 +424,7 @@ export default function CatalystDetail() {
   const isRunDisabled = loading || !hasRequiredInputs || mustUpgrade || showLimitWarning;
 
   const content = (
-    <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       {!output && (
         <View style={styles.progressStepper}>
           <View style={[styles.progressDot, styles.progressDotActive]} />
@@ -425,44 +479,44 @@ export default function CatalystDetail() {
       {isBuiltIn && builtInCoach ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Context</Text>
-          <View style={styles.field}>
-            <Text style={styles.label}>{builtInCoach.slots[0].name.charAt(0).toUpperCase() + builtInCoach.slots[0].name.slice(1)}</Text>
-            <View style={styles.inputWithIcon}>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder={builtInCoach.slots[0].placeholder}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={(inputs[builtInCoach.slots[0].name] ?? '').toString()}
-                onChangeText={(t) => setInputs((p) => ({ ...p, [builtInCoach.slots[0].name]: t }))}
-                editable={!isRefining}
-                multiline
-                numberOfLines={4}
-              />
-              <MagicWandButton
-                onPress={() => handleMagicWandPress(builtInCoach.slots[0].name, 'advice')}
-                loading={isRefining === builtInCoach.slots[0].name}
-              />
-            </View>
-          </View>
-          <View style={styles.field}>
-            <Text style={styles.label}>{builtInCoach.slots[1].name.charAt(0).toUpperCase() + builtInCoach.slots[1].name.slice(1)}</Text>
-            <View style={styles.inputWithIcon}>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder={builtInCoach.slots[1].placeholder}
-                placeholderTextColor={theme.colors.textSecondary}
-                value={(inputs[builtInCoach.slots[1].name] ?? '').toString()}
-                onChangeText={(t) => setInputs((p) => ({ ...p, [builtInCoach.slots[1].name]: t }))}
-                editable={!isRefining}
-                multiline
-                numberOfLines={4}
-              />
-              <MagicWandButton
-                onPress={() => handleMagicWandPress(builtInCoach.slots[1].name, 'context')}
-                loading={isRefining === builtInCoach.slots[1].name}
-              />
-            </View>
-          </View>
+          {builtInCoach.slots.map((slot, idx) => {
+            const isMissing = missingFieldName === slot.name;
+            return (
+              <View
+                key={slot.name}
+                ref={(r) => { slotRefsMap.current[slot.name] = r; }}
+                style={styles.field}
+                collapsable={false}
+              >
+                <Text style={styles.label}>{slot.name.charAt(0).toUpperCase() + slot.name.slice(1)}</Text>
+                <View style={styles.inputWithIcon}>
+                  <TextInput
+                    ref={(r) => { inputRefsMap.current[slot.name] = r; }}
+                    style={[
+                      styles.input,
+                      styles.textArea,
+                      isMissing && styles.inputError,
+                    ]}
+                    placeholder={slot.placeholder}
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={(inputs[slot.name] ?? '').toString()}
+                    onChangeText={(t) => {
+                      setInputs((p) => ({ ...p, [slot.name]: t }));
+                      if (missingFieldName === slot.name) setMissingFieldName(null);
+                    }}
+                    editable={!isRefining}
+                    multiline
+                    numberOfLines={4}
+                  />
+                  <MagicWandButton
+                    onPress={() => handleMagicWandPress(slot.name)}
+                    loading={isRefining === slot.name}
+                  />
+                </View>
+                {isMissing && <Text style={styles.errorHint}>Required</Text>}
+              </View>
+            );
+          })}
           <View style={styles.field}>
             <Text style={styles.label}>{builtInCoach.lever.name}</Text>
             <View style={styles.leverRow}>
@@ -483,6 +537,23 @@ export default function CatalystDetail() {
               <Text style={styles.leverLabel}>{builtInCoach.lever.maxLabel}</Text>
             </View>
           </View>
+          {refineQuestions.length > 0 && (
+            <View style={styles.questionsRow}>
+              <Text style={styles.questionsLabel}>Clarify:</Text>
+              <View style={styles.questionsChips}>
+                {refineQuestions.map((q) => (
+                  <TouchableOpacity
+                    key={q.id}
+                    style={styles.questionChip}
+                    onPress={() => handleQuestionTap(q)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.questionChipText} numberOfLines={2}>{q.text}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       ) : (
         <View style={styles.section}>
@@ -528,12 +599,6 @@ export default function CatalystDetail() {
         </View>
       )}
 
-      {validationPrompt && (
-        <View style={styles.validationPrompt}>
-          <Text style={styles.validationText}>{validationPrompt.placeholder}</Text>
-        </View>
-      )}
-
       {loading && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Guidance</Text>
@@ -560,7 +625,9 @@ export default function CatalystDetail() {
               ? 'Upgrade to Pro'
               : showLimitWarning
                 ? 'Sign In to Continue'
-                : 'Generate Coach'}
+                : !hasRequiredInputs
+                  ? 'Add context'
+                  : 'Get guidance'}
           </Text>
         )}
       </TouchableOpacity>
@@ -576,7 +643,7 @@ export default function CatalystDetail() {
           <Text style={styles.sectionTitle}>Guidance</Text>
           <View style={styles.outputHeroCard}>
             <Markdown style={markdownStyles} debugPrintTree={false}>
-              {normalizeMarkdownOutput(output)}
+              {normalizeRefineOutput(output)}
             </Markdown>
           </View>
           <View style={styles.resultActions}>
@@ -594,16 +661,17 @@ export default function CatalystDetail() {
               disabled={loading}
             >
               <Ionicons name="share-outline" size={24} color={theme.colors.accent} />
-              <Text style={styles.resultIconLabel}>Share</Text>
+              <Text style={styles.resultIconLabel}>Send</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.resultIconButton} onPress={handleSave}>
+              <Ionicons name="bookmark-outline" size={24} color={theme.colors.accent} />
+              <Text style={styles.resultIconLabel}>Save</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.resultIconButton} onPress={handleRunAgain}>
               <Ionicons name="refresh-outline" size={24} color={theme.colors.accent} />
-              <Text style={styles.resultIconLabel}>Regenerate</Text>
+              <Text style={styles.resultIconLabel}>Run again</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.saveLink} onPress={handleSave}>
-            <Text style={styles.saveLinkText}>Save to library</Text>
-          </TouchableOpacity>
           <View style={styles.feedbackSection}>
             <Text style={styles.feedbackLabel}>Was this helpful?</Text>
             <View style={styles.feedbackButtons}>
@@ -707,6 +775,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   textArea: { minHeight: 100, textAlignVertical: 'top' },
+  inputError: { borderColor: theme.colors.error, borderWidth: 2 },
+  errorHint: { ...theme.typography.bodySmall, color: theme.colors.error, marginTop: theme.spacing.xs },
   leverRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
   leverLabel: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, width: 60 },
   leverButtons: { flex: 1, flexDirection: 'row', gap: theme.spacing.xs },
@@ -714,6 +784,19 @@ const styles = StyleSheet.create({
   leverButtonActive: { backgroundColor: theme.colors.accent },
   leverButtonText: { ...theme.typography.bodySmall, color: theme.colors.text },
   leverButtonTextActive: { color: theme.colors.background, fontWeight: '600' },
+  questionsRow: { marginTop: theme.spacing.sm, marginBottom: theme.spacing.md },
+  questionsLabel: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginBottom: theme.spacing.xs, fontWeight: '600' },
+  questionsChips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
+  questionChip: {
+    backgroundColor: theme.colors.accentLightBackground,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    maxWidth: '100%',
+  },
+  questionChipText: { ...theme.typography.bodySmall, color: theme.colors.accent, fontWeight: '500' },
   inputRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
   inputKey: { flex: 2 },
   inputValue: { flex: 3, minHeight: 40 },
@@ -724,8 +807,6 @@ const styles = StyleSheet.create({
   inputItemValue: { ...theme.typography.body, color: theme.colors.textSecondary, flex: 1 },
   removeButton: { padding: theme.spacing.xs },
   removeButtonText: { ...theme.typography.h2, color: theme.colors.error, fontSize: 24 },
-  validationPrompt: { marginBottom: theme.spacing.sm },
-  validationText: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, fontStyle: 'italic' },
   runButton: { backgroundColor: theme.colors.accent, borderRadius: theme.borderRadius.md, padding: theme.spacing.md, alignItems: 'center', marginBottom: theme.spacing.md },
   runButtonDisabled: { opacity: 0.5 },
   runButtonText: { ...theme.typography.body, color: theme.colors.background, fontWeight: '600' },
@@ -789,12 +870,6 @@ const styles = StyleSheet.create({
     ...theme.typography.bodySmall,
     color: theme.colors.accent,
     marginTop: theme.spacing.xs,
-    fontWeight: '600',
-  },
-  saveLink: { alignItems: 'center', marginTop: theme.spacing.sm },
-  saveLinkText: {
-    ...theme.typography.bodySmall,
-    color: theme.colors.accent,
     fontWeight: '600',
   },
   feedbackSection: {

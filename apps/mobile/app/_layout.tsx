@@ -56,7 +56,9 @@ export default function RootLayout() {
               <Stack.Screen name="auth/callback" options={{ title: 'Signing In', headerShown: false }} />
               <Stack.Screen name="index" options={{ title: 'Choose Your Coach' }} />
               <Stack.Screen name="history" options={{ title: 'My Library' }} />
+              <Stack.Screen name="saved" options={{ title: 'Saved' }} />
               <Stack.Screen name="history/[id]" options={{ title: 'Saved Run' }} />
+              <Stack.Screen name="saved/[id]" options={{ title: 'Saved' }} />
               <Stack.Screen name="onboarding" options={{ title: 'Welcome' }} />
               <Stack.Screen name="profile" options={{ title: 'Edit Profile' }} />
               <Stack.Screen name="catalyst/[id]" options={{ title: 'Coach' }} />

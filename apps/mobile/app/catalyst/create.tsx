@@ -17,6 +17,7 @@ import { theme } from '@/theme';
 import MagicWandButton from '@/src/components/MagicWandButton';
 import { createCatalyst } from '@/src/lib/api';
 import { getRealAISuggestion } from '@/utils/ai-service';
+import { normalizeRefineOutput } from '@/src/lib/formatOutput';
 import { showAlert } from '@/src/lib/alert';
 import { useSupabase } from '@/src/providers/SupabaseProvider';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
@@ -48,11 +49,11 @@ export default function CreateCatalyst() {
   const [isRefining, setIsRefining] = useState<string | null>(null);
 
   const handleMagicWandPress = useCallback(
-    async (field: 'name' | 'description' | 'inputsJson' | 'promptTemplate', fieldType?: 'advice' | 'context') => {
+    async (field: 'name' | 'description' | 'inputsJson' | 'promptTemplate', fieldType?: 'advice' | 'context' | 'name') => {
       if (Platform.OS !== 'web') Vibration.vibrate(10);
       setIsRefining(field);
 
-      if (fieldType === 'advice' || fieldType === 'context') {
+      if (fieldType === 'advice' || fieldType === 'context' || fieldType === 'name') {
         const currentText =
           field === 'name'
             ? name
@@ -62,7 +63,12 @@ export default function CreateCatalyst() {
                 ? inputsJson
                 : promptTemplate;
         try {
-          const newText = await getRealAISuggestion(fieldType, currentText.trim());
+          let newText = await getRealAISuggestion(fieldType, currentText.trim());
+          if (field === 'name') {
+            newText = newText.split('\n')[0].trim().slice(0, 80);
+          } else {
+            newText = normalizeRefineOutput(newText);
+          }
           if (field === 'name') setName(newText);
           else if (field === 'description') setDescription(newText);
         } catch (err) {
@@ -176,7 +182,7 @@ export default function CreateCatalyst() {
                 editable={!isRefining}
               />
               <MagicWandButton
-                onPress={() => handleMagicWandPress('name', 'advice')}
+                onPress={() => handleMagicWandPress('name', 'name')}
                 loading={isRefining === 'name'}
               />
             </View>
