@@ -21,15 +21,15 @@
       "ios": { "simulator": false },
       "android": { "buildType": "app-bundle" },
       "channel": "production",
-      "env": { "EXPO_PUBLIC_SHOW_TEST_NAV": "true" }
+      "env": { "EXPO_PUBLIC_SHOW_TEST_NAV": "false" }
     }
   },
   "submit": {
     "production": {
       "ios": {
-        "appleId": "your-apple-id@example.com",
-        "ascAppId": "your-app-store-connect-app-id",
-        "appleTeamId": "your-apple-team-id"
+        "appleId": "prabhakaran@prabhakaranjm.in",
+        "ascAppId": "6758994240",
+        "appleTeamId": "42534993X7"
       },
       "android": {
         "serviceAccountKeyPath": "./path/to/api-key.json",

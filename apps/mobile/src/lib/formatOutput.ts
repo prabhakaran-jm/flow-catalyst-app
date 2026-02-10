@@ -31,12 +31,30 @@ export function normalizeRefineOutput(text: string): string {
   // Fix corrupted _**_ (e.g. _**C. → **C.)
   out = out.replace(/_\*\*/g, '**');
 
-  // Fix Roman numerals at start of line: **I.\n or **II. \n (standalone, not **I. Introduction**)
-  out = out.replace(/\*\*([IVXLC]+)\.(\s*[\n\r])/g, '**$1.**$2');
+  // Fix trailing "**" on lines that are not starting bold: "Logistical Considerations**" → "Logistical Considerations"
+  out = out.replace(/^(?!\*\*)([^\n]*?)\*\*\s*$/gm, '$1');
+
+  // Fix ".**IV." style markers inside sentences: "Budget.**IV." → "Budget. **IV.**"
+  out = out.replace(/\.\s*\*\*([IVXLC]+)\.(\s|$)/gm, '. **$1.**$2');
+
+  // Fix unclosed **Roman. at start of line: "**I." or "**II." → "**I.**" (so markdown renders)
+  out = out.replace(/^\*\*([IVXLC]+)\.(\s*[\n\r])/gm, '**$1.**$2');
+  out = out.replace(/^\*\*([IVXLC]+)\.(\s+)(?=[A-Z])/gm, '**$1.**$2');
+
+  // Fix orphan **Roman. at end of line: "statement.**V." → "statement.**V.**"
+  out = out.replace(/([.!?])\s*\*\*([IVXLC]+)\.(\s*)$/gm, '$1 **$2.**$3');
+  out = out.replace(/([^\s*])\*\*([IVXLC]+)\.(\s*[\n\r])/gm, '$1 **$2.**$3');
+  // Catch-all: **Roman. before newline/end with no closing ** → add closing
+  out = out.replace(/\*\*([IVXLC]+)\.(\s*)([\n\r]|$)/gm, '**$1.**$2$3');
+
+  // Fix lettered sections: **A.\n or **B. (standalone)
+  out = out.replace(/^\*\*([A-Z])\.(\s*[\n\r])/gm, '**$1.**$2');
   out = out.replace(/\*\*([A-Z])\.(\s*[\n\r])/g, '**$1.**$2');
 
-  // Fix "1.Define" → "1. Define" (missing space after number)
+  // Fix "1.Define" or "1.Brainstorm" → "1. Define" (missing space after number)
   out = out.replace(/(\d+)\.([A-Za-z])/g, '$1. $2');
+  // Fix "1.**Brainstorm" → "1. **Brainstorm" (number directly before bold)
+  out = out.replace(/(\d+)\.\*\*([A-Za-z])/g, '$1. **$2');
 
   // Headings and structure
   out = out.replace(/([^\n\r])##/g, '$1\n\n##');

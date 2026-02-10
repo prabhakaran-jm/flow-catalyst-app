@@ -321,7 +321,7 @@ serve(async (req) => {
         prompt = prompt.replace(new RegExp(placeholder1.replace(/[{}]/g, '\\$&'), 'g'), stringValue);
         prompt = prompt.replace(new RegExp(placeholder2.replace(/[{}]/g, '\\$&'), 'g'), stringValue);
       }
-      prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis (no space inside asterisks—use **text** not ** text **), - for bullets. Ensure headings start with ## on a new line with a space after ##. Do NOT indent lines with 4+ spaces (that creates code blocks). Use regular - bullets at column 0. Be scannable.]`;
+      prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis (no space inside asterisks—use **text** not ** text **), - for bullets. Ensure headings start with ## on a new line with a space after ##. Do NOT indent lines with 4+ spaces (that creates code blocks). Use regular - bullets at column 0. For numbered sections use "1. Text" or "## Heading" format—do NOT use **I. **II. or Roman numerals with asterisks. Be scannable.]`;
       const promptDebug = `Built-in: ${built_in.id}\nInputs: ${JSON.stringify(inputs, null, 2)}\n\nFinal Prompt:\n${prompt}`;
       try {
         const aiOutput = await callAI(prompt);
@@ -511,7 +511,7 @@ serve(async (req) => {
     prompt += OUTPUT_INSTRUCTIONS;
 
     // Mobile-friendly output instructions
-    prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis (no space inside asterisks—use **text** not ** text **), - for bullets. Ensure headings start with ## on a new line with a space after ##. Do NOT indent lines with 4+ spaces (that creates code blocks). Use regular - bullets at column 0. Be scannable.]`;
+    prompt += `\n\n[Format for mobile: Use short paragraphs (2-3 sentences max), bullet points, clear headings on their own lines (## Heading Text), and concise language. Keep total length under 500 words. Use markdown: **bold** for emphasis (no space inside asterisks—use **text** not ** text **), - for bullets. Ensure headings start with ## on a new line with a space after ##. Do NOT indent lines with 4+ spaces (that creates code blocks). Use regular - bullets at column 0. For numbered sections use "1. Text" or "## Heading" format—do NOT use **I. **II. or Roman numerals with asterisks. Be scannable.]`;
 
     // Build debug string for troubleshooting
     const promptDebug = [

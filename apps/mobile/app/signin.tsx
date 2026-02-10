@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, ScrollView, Platform, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { theme } from '@/theme';
@@ -154,129 +154,162 @@ export default function SignIn() {
     router.setParams({ error: undefined });
   };
 
+  const dismissKeyboard = () => Keyboard.dismiss();
+
   return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Welcome to Flow Catalyst</Text>
-          <Text style={styles.subtitle}>
-            {emailSent
-              ? 'Enter the code from your email to sign in'
-              : 'Enter your email to get started'}
-          </Text>
-        </View>
-
-        {!emailSent ? (
-          <View style={styles.form}>
-            <View style={styles.field}>
-              <Text style={styles.label}>Email Address</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="you@example.com"
-                placeholderTextColor={theme.colors.textSecondary}
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  setError(null);
-                  // Clear URL error params when user starts typing
-                  if (params.error) {
-                    router.setParams({ error: undefined });
-                  }
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-              />
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+    >
+      <TouchableWithoutFeedback onPress={dismissKeyboard} accessible={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.content}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Welcome to Flow Catalyst</Text>
+              <Text style={styles.subtitle}>
+                {emailSent
+                  ? 'Enter the code from your email to sign in'
+                  : 'Enter your email to get started'}
+              </Text>
             </View>
 
-            {error && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
+            {!emailSent ? (
+              <View style={styles.form}>
+                <View style={styles.field}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="you@example.com"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={email}
+                    onChangeText={(text) => {
+                      setEmail(text);
+                      setError(null);
+                      if (params.error) router.setParams({ error: undefined });
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!loading}
+                  />
+                </View>
+
+                {error && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.button, loading && styles.buttonDisabled]}
+                  onPress={handleSendOtp}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={theme.colors.background} />
+                  ) : (
+                    <Text style={styles.buttonText}>Send Verification Code</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.form}>
+                <View style={styles.emailSentContainer}>
+                  <Text style={styles.emailSentText}>
+                    We've sent a verification code to:
+                  </Text>
+                  <Text style={styles.emailAddress}>{email}</Text>
+                  <Text style={styles.emailSentHint}>
+                    Enter the 8-digit code from your email below. It may take 1–2
+                    minutes to arrive; check spam if you don't see it.
+                    {'\n\n'}
+                    Codes expire after 1 hour. If expired, tap "Resend Code"
+                    below.
+                  </Text>
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={styles.label}>Verification Code</Text>
+                  <Text style={styles.hint}>
+                    Enter the 8-digit code from your email
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter code"
+                    placeholderTextColor={theme.colors.textSecondary}
+                    value={otpCode}
+                    onChangeText={(text) => {
+                      const cleaned = text.replace(/\D/g, '').slice(0, 10);
+                      setOtpCode(cleaned);
+                      setError(null);
+                      if (cleaned.length >= 8 && !loading) {
+                        Keyboard.dismiss();
+                      }
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    editable={!loading}
+                    returnKeyType="done"
+                    onSubmitEditing={handleVerifyOtp}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.button, loading && styles.buttonDisabled]}
+                  onPress={handleVerifyOtp}
+                  disabled={loading || otpCode.length < 8}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={theme.colors.background} />
+                  ) : (
+                    <Text style={styles.buttonText}>Verify Code</Text>
+                  )}
+                </TouchableOpacity>
+
+                {error && (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    handleResendEmail();
+                  }}
+                >
+                  <Text style={styles.secondaryButtonText}>Resend Code</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    handleResendEmail();
+                  }}
+                >
+                  <Text style={styles.linkButtonText}>Use Different Email</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.dismissKeypadButton}
+                  onPress={dismissKeyboard}
+                >
+                  <Text style={styles.dismissKeypadText}>Dismiss keypad</Text>
+                </TouchableOpacity>
               </View>
             )}
-
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleSendOtp}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={theme.colors.background} />
-              ) : (
-                <Text style={styles.buttonText}>Send Verification Code</Text>
-              )}
-            </TouchableOpacity>
           </View>
-        ) : (
-          <View style={styles.form}>
-            <View style={styles.emailSentContainer}>
-              <Text style={styles.emailSentText}>
-                We've sent a verification code to:
-              </Text>
-              <Text style={styles.emailAddress}>{email}</Text>
-              <Text style={styles.emailSentHint}>
-                Enter the 8-digit code from your email below.
-                {'\n\n'}
-                Codes expire after 1 hour. If expired, tap "Resend Code" below.
-              </Text>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={styles.label}>Verification Code</Text>
-              <Text style={styles.hint}>
-                Enter the 8-digit code from your email
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter code"
-                placeholderTextColor={theme.colors.textSecondary}
-                value={otpCode}
-                onChangeText={(text) => {
-                  setOtpCode(text.replace(/\D/g, '').slice(0, 10));
-                  setError(null);
-                }}
-                keyboardType="number-pad"
-                maxLength={10}
-                editable={!loading}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleVerifyOtp}
-              disabled={loading || otpCode.length < 8}
-            >
-              {loading ? (
-                <ActivityIndicator color={theme.colors.background} />
-              ) : (
-                <Text style={styles.buttonText}>Verify Code</Text>
-              )}
-            </TouchableOpacity>
-
-            {error && (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleResendEmail}
-            >
-              <Text style={styles.secondaryButtonText}>Resend Code</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.linkButton}
-              onPress={handleResendEmail}
-            >
-              <Text style={styles.linkButtonText}>Use Different Email</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -285,10 +318,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 40,
+  },
   content: {
     flex: 1,
     padding: theme.spacing.lg,
     justifyContent: 'center',
+    minHeight: 400,
   },
   header: {
     marginBottom: theme.spacing.xl,
@@ -368,6 +406,15 @@ const styles = StyleSheet.create({
   linkButtonText: {
     ...theme.typography.body,
     color: theme.colors.accent,
+  },
+  dismissKeypadButton: {
+    marginTop: theme.spacing.lg,
+    padding: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  dismissKeypadText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
   },
   errorContainer: {
     backgroundColor: '#FEE2E2',

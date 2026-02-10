@@ -76,7 +76,7 @@ export default function Paywall() {
       Alert.alert(
         'Purchase Failed',
         isConfigError
-          ? 'In-app purchases require proper setup: ensure products are created in Google Play Console and linked in RevenueCat Dashboard.'
+          ? `In-app purchases require proper setup: ensure products are created in ${Platform.OS === 'ios' ? 'App Store Connect' : 'Google Play Console'} and linked in RevenueCat Dashboard.`
           : msg
       );
     } finally {
