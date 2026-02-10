@@ -20,16 +20,9 @@ cd apps/mobile
 pnpm start
 ```
 
-### 2. Run Setup Check
+### 2. Verify services
 
-```powershell
-# Windows
-.\scripts\test-local.ps1
-
-# Mac/Linux
-chmod +x scripts/test-local.sh
-./scripts/test-local.sh
-```
+Confirm Terminal 1 shows Supabase running and Terminal 2 shows Edge Functions listening (e.g. on port 54321 and 9999). Then start the app in Terminal 3.
 
 ### 3. Test in App
 
