@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const ANONYMOUS_RUNS_KEY = '@flow_catalyst:anonymous_runs_used';
 const PROFILE_NUDGE_KEY = '@flow_catalyst:profile_nudge_seen';
 const SAVED_RESULTS_KEY = 'saved_results';
+const ONBOARDING_KEY = '@flow_catalyst:onboarding_completed';
 
 export interface SavedResult {
   id: string;
@@ -17,6 +18,8 @@ export interface SavedResult {
 
 interface AppState {
   hasCompletedOnboarding: boolean;
+  onboardingLoaded: boolean;
+  loadHasCompletedOnboarding: () => Promise<void>;
   setHasCompletedOnboarding: (value: boolean) => void;
   anonymousRunsUsed: number;
   loadAnonymousRunsUsed: () => Promise<void>;
@@ -32,8 +35,19 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set, get) => ({
   hasCompletedOnboarding: false,
-  setHasCompletedOnboarding: (value: boolean) =>
-    set({ hasCompletedOnboarding: value }),
+  onboardingLoaded: false,
+  loadHasCompletedOnboarding: async () => {
+    try {
+      const v = await AsyncStorage.getItem(ONBOARDING_KEY);
+      set({ hasCompletedOnboarding: v === '1', onboardingLoaded: true });
+    } catch {
+      set({ onboardingLoaded: true });
+    }
+  },
+  setHasCompletedOnboarding: (value: boolean) => {
+    AsyncStorage.setItem(ONBOARDING_KEY, value ? '1' : '0');
+    set({ hasCompletedOnboarding: value });
+  },
   anonymousRunsUsed: 0,
   loadAnonymousRunsUsed: async () => {
     try {

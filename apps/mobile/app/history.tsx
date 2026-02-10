@@ -72,7 +72,7 @@ export default function HistoryScreen() {
   };
 
   const handleOpen = (run: SavedRun) => {
-    router.push({ pathname: '/history/[id]', params: { id: run.id } });
+    router.push({ pathname: '/history/[id]', params: { id: run.id } } as any);
   };
 
   if (authLoading || !user) {

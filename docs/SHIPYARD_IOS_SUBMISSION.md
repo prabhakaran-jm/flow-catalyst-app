@@ -4,6 +4,18 @@ Use this to get your app on TestFlight with a working RevenueCat paywall for Shi
 
 ---
 
+## Shipyard rules (official recap)
+
+- **Mobile only** — iOS, Android, or cross-platform (no web/desktop).
+- **RevenueCat integration is mandatory** — subscriptions or in-app purchases; they must be **purchasable**. Test store configuration alone is not enough; full RevenueCat + App Store Connect setup required.
+- **Must be on TestFlight (iOS)** — at least one build submitted to App Store Connect, available on the **TestFlight** tab. **External testing** must be enabled with a **public link**. Attach that public link to your **Devpost** submission so judges can install without being added manually.
+- **Publishing to the App Store is optional** — you do not need to pass App Review or go live; TestFlight distribution is sufficient.
+- **Winning apps** will be installed and tested to verify RevenueCat integration. If the app cannot be installed or does not have working subscriptions/IAP, it may be disqualified.
+
+**Summary:** Judges must be able to install your app (TestFlight public link) and use core functionality. Subscriptions/IAP must be purchasable (e.g. via Sandbox). No production release required.
+
+---
+
 ## Reconfiguring for a new Expo account
 
 If you switched to a new Expo account:
@@ -114,7 +126,8 @@ Judges (and you) can install via that link. They will use **Sandbox**: no real p
 - [ ] TestFlight build installs and launches.
 - [ ] You can open the paywall and see **pricing** (Monthly / Annual).
 - [ ] You can tap **Unlock Pro** and complete a **sandbox** purchase (use a Sandbox Apple ID in Settings → App Store → Sandbox Account if needed).
-- [ ] Demo video (2–3 min) shows onboarding → core features → paywall and subscription flow.
+- [ ] **Public TestFlight link** is copied and pasted into your Devpost submission (App Access / Test link). Judges use this to install; no manual add required.
+- [ ] **Demo video** is the main way judges view all apps; shortlisted apps are installed for deeper review. Show onboarding → core features → paywall and subscription flow (2–3 min).
 - [ ] Written proposal, technical docs (RevenueCat + architecture), and developer bio are ready.
 
 ---

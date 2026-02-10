@@ -11,7 +11,7 @@ interface RevenueCatContextType {
   purchasePro: () => Promise<void>;
   purchasePackage: (pkg: unknown) => Promise<void>;
   restorePurchases: () => Promise<void>;
-  presentPaywall: () => Promise<boolean>;
+  presentPaywall: () => Promise<{ unlocked: boolean; showCustomPaywall: boolean }>;
   setPlanForTesting?: (plan: Plan) => void;
 }
 
@@ -56,7 +56,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     setPlan(newPlan);
   };
 
-  const presentPaywall = async (): Promise<boolean> => false;
+  const presentPaywall = async () => ({ unlocked: false, showCustomPaywall: true });
 
   const value: RevenueCatContextType = {
     plan,

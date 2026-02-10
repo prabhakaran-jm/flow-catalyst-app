@@ -33,7 +33,7 @@ export default function EditCatalyst() {
   useEffect(() => {
     if (!authLoading && user && plan === 'free') {
       if (skipRevenueCat) router.replace('/paywall');
-      else void presentPaywall();
+      else void presentPaywall().then((r) => { if (r.showCustomPaywall) router.replace('/paywall'); });
     }
   }, [plan, authLoading, user, router, skipRevenueCat, presentPaywall]);
 

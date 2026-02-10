@@ -71,7 +71,7 @@ export default function SavedScreen() {
         <View style={styles.list}>
           {savedResults.map((r) => (
             <View key={r.id} style={styles.card}>
-              <TouchableOpacity style={styles.cardContent} onPress={() => router.push(`/saved/${r.id}`)} activeOpacity={0.7}>
+              <TouchableOpacity style={styles.cardContent} onPress={() => router.push(`/saved/${r.id}` as any)} activeOpacity={0.7}>
                 <View style={styles.cardHeader}>
                   <Text style={styles.coachName}>{r.coachTitle}</Text>
                   <Text style={styles.date}>{formatDate(r.createdAt)}</Text>

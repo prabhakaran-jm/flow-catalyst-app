@@ -115,14 +115,42 @@ See **iOS integration (step-by-step)** above. Summary: create a subscription gro
 - Use Test Navigation **Set Pro** for quick testing without store setup
 - See `docs/REVENUECAT_TESTING.md` for sandbox testing
 
-## RevenueCat UI (hosted paywall)
+## How the paywall works (after the fix)
 
-The app uses [RevenueCat UI](https://www.revenuecat.com/docs/tools/paywalls/displaying-paywalls) when RevenueCat is enabled (production builds):
+### Two ways the paywall can show
 
-- **`presentPaywall()`** – Opens RevenueCat’s hosted paywall as a modal. Used when the user taps “Upgrade”, “Create Coach”, or a Pro-only coach and doesn’t have the `pro` entitlement. On purchase or restore, entitlements are refreshed and the user gets Pro.
-- **Custom `/paywall` screen** – Still used when **skipRevenueCat** is true (preview/development builds) so testers can use “Set Pro” / “Free for demo” without the store.
+1. **RevenueCat UI (modal)** — Used in **production** when RevenueCat is configured (`skipRevenueCat` is false). The app calls `presentPaywall()` from `RevenueCatProvider`, which uses `RevenueCatUI.presentPaywall()` and shows RevenueCat’s hosted paywall as a **modal** (pricing, purchase, restore handled by the SDK).
+2. **Custom paywall screen (route `/paywall`)** — Used when:
+   - **skipRevenueCat** is true (preview/dev builds): testers see “Set Pro” / “Free for demo” and no real store.
+   - **RevenueCat UI fails** (e.g. Error 23): after the user dismisses the error popup, the app opens the custom paywall so they can use **Restore** or **Retry** and still reach pricing if the config is fixed.
 
-So in production, the flow is: tap upgrade → RevenueCat modal with pricing → purchase/restore → Pro unlocked. No manual “Loading pricing” screen; RevenueCat UI handles loading and display.
+### What happens when the user taps “Upgrade” (or similar)
+
+- **If skipRevenueCat:** The app navigates to `/paywall` (custom screen). User can tap “Set Pro” (testing) or see “Free for demo” options.
+- **If RevenueCat is enabled:** The app calls `await presentPaywall()`. That:
+  1. Calls `RevenueCatUI.presentPaywall()` and shows the **RevenueCat modal** (current offering, Monthly/Annual, Subscribe, Restore).
+  2. Returns `{ unlocked: boolean; showCustomPaywall: boolean }`:
+     - **unlocked = true** → User purchased or restored in the modal; entitlements were refreshed and the user has Pro. The caller (e.g. index or catalyst screen) may then navigate (e.g. to Create Coach or the coach run).
+     - **unlocked = false, showCustomPaywall = true** → RevenueCat UI failed (e.g. Error 23) or threw. The caller **navigates to `/paywall`** so the user sees the **custom paywall** (Restore, Retry, “Pricing not available” if offerings still fail).
+     - **unlocked = false, showCustomPaywall = false** → User cancelled or paywall was not presented. No navigation; user stays on the same screen.
+
+So in the success path: **tap Upgrade → RevenueCat modal → purchase or restore → Pro unlocked**. In the error path: **tap Upgrade → RevenueCat modal shows error popup → user dismisses → app opens custom paywall** so they can Retry or Restore.
+
+### Custom paywall screen (`/paywall`)
+
+- **Data:** Uses `Purchases.getOfferings()` (via `fetchOfferings()` in the provider). Packages are derived from the current offering (e.g. monthly, annual).
+- **Loading:** Shows “Loading pricing…” while `loadingOfferings` is true. A **client-side timeout (12 s)** sets `offeringsTimedOut`; after that the screen shows **“Pricing not available yet.”** and a **Retry** button instead of spinning forever.
+- **Retry:** Tapping Retry calls `fetchOfferings()` again and clears the timeout so loading can run again.
+- **Restore:** “Restore purchase” calls `restorePurchases()` and refreshes entitlements; if the user has an active subscription they get Pro.
+- **Unlock Pro:** Enabled only when there are packages (or in demo mode). Tapping it runs `purchasePackage(selectedPackage)` (or in demo, `setPlanForTesting('pro')`).
+
+### Summary
+
+| Build / situation        | What the user sees                          |
+|--------------------------|---------------------------------------------|
+| Production, config OK    | RevenueCat modal → purchase/restore → Pro   |
+| Production, Error 23     | Error popup → dismiss → custom paywall      |
+| Preview / dev            | Custom paywall (Set Pro / Free for demo)    |
 
 **Paywall linked to offering:** On the offering detail page (Product catalog → Offerings → **default**), the **Paywall** tab may show "No paywall is linked to this offering". That's OK: RevenueCat still shows a **default paywall** (lists all packages). To use a custom design and copy, click **Add Paywall** (or the Paywall tab), create a paywall in the Paywalls editor, and link it to the **default** offering.
 
@@ -162,6 +190,40 @@ In development, the app enables RevenueCat **debug** logging and prints hints wh
 - Run the app from the repo (e.g. `npx expo start` or a dev build) and open the paywall.
 - Watch Metro (or device logs) for `[RevenueCat]` messages: they indicate whether offerings loaded or why they might have failed.
 - Fix any misconfig (product IDs, offering packages, API key) then try again; use **Retry** on the paywall to refetch offerings.
+
+### Error 23: "There is an issue with your configuration"
+
+When RevenueCat UI shows a popup **"Error 23: There is an issue with your configuration"**, it means **products in RevenueCat could not be fetched from the App Store** (or Play Store).
+
+**Behavior:**
+1. The user sees the error popup.
+2. After dismissing it, the app **falls back to the custom paywall screen** (`/paywall`).
+3. The custom paywall may show "Pricing not available" with a **Retry** button.
+
+**Fix the configuration:**
+
+1. **App Store Connect**
+   - **Agreements:** Ensure the "Paid Apps" agreement is signed and bank/tax info is active.
+   - **Subscriptions:** Must be "Ready to Submit" or "Approved".
+   - **Products:** Both `flow_catalyst_monthly` and `flow_catalyst_annual` must be attached to the specific App Version (e.g. 1.0) you are testing.
+   - **Bundle ID:** Must match exactly across Expo (`app.json`), RevenueCat, and App Store Connect.
+
+2. **RevenueCat Dashboard**
+   - **Products:** Product IDs must match App Store Connect exactly.
+   - **Offering:** The **Current** offering must have packages (`$rc_monthly`, etc.) attached to these products.
+   - **API Key:** Ensure the app is using the **Public** iOS API key (`appl_...`).
+
+3. **Device / Environment**
+   - **Real Device:** StoreKit often fails on Simulators. Test on a physical device.
+   - **Sandbox User:** In iOS Settings > App Store > Sandbox Account, sign in with a dedicated Sandbox Tester account (not your main Apple ID).
+
+### Pricing not loading (Infinite Spinner)
+
+If the custom paywall spins on "Loading pricing…" forever:
+
+- **Timeout:** The app has a 12-second client-side timeout. If offerings don't load by then, it shows **"Pricing not available"** and a **Retry** button.
+- **Cause:** Usually a missing API key or network issue.
+- **Fix:** Check `REVENUECAT_API_KEY_IOS` in your `env.ts` (local) or EAS Secrets (production). Ensure you are connected to the internet.
 
 ### If it still fails
 

@@ -32,6 +32,13 @@ import Markdown from 'react-native-markdown-display';
 import MagicWandButton from '@/src/components/MagicWandButton';
 
 const BUILTIN_PREFIX = 'builtin-';
+const LEVER_STEPS = [
+  { value: 0 },
+  { value: 25 },
+  { value: 50 },
+  { value: 75 },
+  { value: 100 },
+] as const;
 
 function getBuiltInIdFromParam(id: string): BuiltInCoachId | null {
   if (id?.startsWith(BUILTIN_PREFIX)) {
@@ -220,7 +227,10 @@ export default function CatalystDetail() {
 
     if (mustUpgrade) {
       if (skipRevenueCat) router.push('/paywall');
-      else await presentPaywall();
+      else {
+        const r = await presentPaywall();
+        if (r.showCustomPaywall) router.push('/paywall');
+      }
       return;
     }
 
@@ -232,14 +242,18 @@ export default function CatalystDetail() {
       }
       if (user && plan === 'free' && isProOnlyCoach) {
         if (skipRevenueCat) router.push('/paywall');
-        else await presentPaywall();
+        else {
+          const r = await presentPaywall();
+          if (r.showCustomPaywall) router.push('/paywall');
+        }
         return;
       }
       if (user && plan === 'free' && !skipRevenueCat) {
         const reached = await hasReachedDailyLimit();
         if (reached) {
           showAlert('Daily limit reached', 'Upgrade to Pro for unlimited runs.');
-          await presentPaywall();
+          const r = await presentPaywall();
+          if (r.showCustomPaywall) router.push('/paywall');
           return;
         }
       } else if (!user && anonymousRunsUsed >= 1) {
@@ -254,7 +268,8 @@ export default function CatalystDetail() {
         return;
       }
       if (plan === 'free' && !skipRevenueCat) {
-        await presentPaywall();
+        const r = await presentPaywall();
+        if (r.showCustomPaywall) router.push('/paywall');
         return;
       }
     }
@@ -320,7 +335,10 @@ export default function CatalystDetail() {
       if (msg.includes('Daily limit reached')) {
         showAlert('Daily limit reached', 'Upgrade to Pro for unlimited runs.');
         if (skipRevenueCat) router.push('/paywall');
-        else await presentPaywall();
+        else {
+          const r = await presentPaywall();
+          if (r.showCustomPaywall) router.push('/paywall');
+        }
       }
     } finally {
       setLoading(false);
@@ -347,7 +365,10 @@ export default function CatalystDetail() {
     if (plan === 'free' && count >= 10) {
       showAlert('Pro keeps everything.', 'Upgrade to save more.');
       if (skipRevenueCat) router.push('/paywall');
-      else await presentPaywall();
+      else {
+        const r = await presentPaywall();
+        if (r.showCustomPaywall) router.push('/paywall');
+      }
       return;
     }
     try {
@@ -464,13 +485,13 @@ export default function CatalystDetail() {
       contentContainerStyle={[styles.content, { paddingBottom: (output ? 80 : 0) + theme.spacing.xl * 2 + insets.bottom }]}
       keyboardShouldPersistTaps="handled"
     >
-      {!output && (
-        <View style={styles.progressStepper}>
-          <View style={[styles.progressDot, styles.progressDotActive]} />
-          <View style={styles.progressDot} />
-          <View style={styles.progressDot} />
-        </View>
-      )}
+      <View style={styles.progressStepper}>
+        <View style={[styles.progressDot, styles.progressDotActive]} />
+        <View style={[styles.progressLine, loading || output ? styles.progressLineActive : null]} />
+        <View style={[styles.progressDot, loading || output ? styles.progressDotActive : null]} />
+        <View style={[styles.progressLine, output ? styles.progressLineActive : null]} />
+        <View style={[styles.progressDot, output ? styles.progressDotActive : null]} />
+      </View>
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>{displayName}</Text>
@@ -502,7 +523,10 @@ export default function CatalystDetail() {
             style={styles.upgradeButton}
             onPress={async () => {
               if (skipRevenueCat) router.push('/paywall');
-              else await presentPaywall();
+              else {
+                const r = await presentPaywall();
+                if (r.showCustomPaywall) router.push('/paywall');
+              }
             }}
           >
             <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
@@ -564,22 +588,29 @@ export default function CatalystDetail() {
           })}
           <View style={styles.field}>
             <Text style={styles.label}>{builtInCoach.lever.name}</Text>
-            <View style={styles.leverRow}>
-              <Text style={styles.leverLabel}>{builtInCoach.lever.minLabel}</Text>
-              <View style={styles.leverButtons}>
-                {[0, 25, 50, 75, 100].map((v) => (
+            <View style={styles.leverButtons}>
+              {LEVER_STEPS.map((step) => {
+                const label = step.value === 0
+                  ? builtInCoach.lever.minLabel
+                  : step.value === 100
+                    ? builtInCoach.lever.maxLabel
+                    : step.value === 50
+                      ? 'Balanced'
+                      : step.value < 50
+                        ? `Mild`
+                        : `Strong`;
+                return (
                   <TouchableOpacity
-                    key={v}
-                    style={[styles.leverButton, leverValue === v && styles.leverButtonActive]}
-                    onPress={() => setLeverValue(v)}
+                    key={step.value}
+                    style={[styles.leverButton, leverValue === step.value && styles.leverButtonActive]}
+                    onPress={() => setLeverValue(step.value)}
                   >
-                    <Text style={[styles.leverButtonText, leverValue === v && styles.leverButtonTextActive]}>
-                      {v}
+                    <Text style={[styles.leverButtonText, leverValue === step.value && styles.leverButtonTextActive]}>
+                      {label}
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={styles.leverLabel}>{builtInCoach.lever.maxLabel}</Text>
+                );
+              })}
             </View>
           </View>
           {refineQuestions.length > 0 && (
@@ -718,29 +749,27 @@ export default function CatalystDetail() {
             </TouchableOpacity>
           </View>
           <View style={styles.feedbackSection}>
-            <Text style={styles.feedbackLabel}>Was this helpful?</Text>
-            <View style={styles.feedbackButtons}>
-              <TouchableOpacity
-                style={styles.feedbackButton}
-                onPress={() => setFeedbackHelpful((prev) => (prev === 'helpful' ? null : 'helpful'))}
-              >
-                <Ionicons
-                  name={feedbackHelpful === 'helpful' ? 'thumbs-up' : 'thumbs-up-outline'}
-                  size={20}
-                  color={feedbackHelpful === 'helpful' ? theme.colors.accent : theme.colors.textSecondary}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.feedbackButton}
-                onPress={() => setFeedbackHelpful((prev) => (prev === 'not-helpful' ? null : 'not-helpful'))}
-              >
-                <Ionicons
-                  name={feedbackHelpful === 'not-helpful' ? 'thumbs-down' : 'thumbs-down-outline'}
-                  size={20}
-                  color={feedbackHelpful === 'not-helpful' ? theme.colors.accent : theme.colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
+            {feedbackHelpful ? (
+              <Text style={styles.feedbackThanks}>Thanks for your feedback!</Text>
+            ) : (
+              <>
+                <Text style={styles.feedbackLabel}>Was this helpful?</Text>
+                <View style={styles.feedbackButtons}>
+                  <TouchableOpacity
+                    style={styles.feedbackButton}
+                    onPress={() => setFeedbackHelpful('helpful')}
+                  >
+                    <Ionicons name="thumbs-up-outline" size={20} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.feedbackButton}
+                    onPress={() => setFeedbackHelpful('not-helpful')}
+                  >
+                    <Ionicons name="thumbs-down-outline" size={20} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
           <Text style={styles.footerHint}>Small steps beat perfect plans.</Text>
         </View>
@@ -822,12 +851,10 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 100, textAlignVertical: 'top' },
   inputError: { borderColor: theme.colors.error, borderWidth: 2 },
   errorHint: { ...theme.typography.bodySmall, color: theme.colors.error, marginTop: theme.spacing.xs },
-  leverRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  leverLabel: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, width: 60 },
-  leverButtons: { flex: 1, flexDirection: 'row', gap: theme.spacing.xs },
-  leverButton: { flex: 1, paddingVertical: theme.spacing.sm, alignItems: 'center', backgroundColor: theme.colors.border, borderRadius: theme.borderRadius.sm },
+  leverButtons: { flexDirection: 'row', gap: theme.spacing.xs },
+  leverButton: { flex: 1, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.xs, alignItems: 'center', backgroundColor: theme.colors.border, borderRadius: theme.borderRadius.md },
   leverButtonActive: { backgroundColor: theme.colors.accent },
-  leverButtonText: { ...theme.typography.bodySmall, color: theme.colors.text },
+  leverButtonText: { fontSize: 11, color: theme.colors.text, textAlign: 'center' },
   leverButtonTextActive: { color: theme.colors.background, fontWeight: '600' },
   questionsRow: { marginTop: theme.spacing.sm, marginBottom: theme.spacing.md },
   questionsLabel: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginBottom: theme.spacing.xs, fontWeight: '600' },
@@ -877,7 +904,6 @@ const styles = StyleSheet.create({
   progressStepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
   },
   progressDot: {
@@ -891,6 +917,15 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  progressLine: {
+    height: 2,
+    flex: 1,
+    backgroundColor: theme.colors.border,
+    marginHorizontal: theme.spacing.xs,
+  },
+  progressLineActive: {
+    backgroundColor: theme.colors.accent,
   },
   inputWithIcon: { position: 'relative' },
   outputHeroCard: {
@@ -928,6 +963,11 @@ const styles = StyleSheet.create({
   feedbackLabel: {
     ...theme.typography.bodySmall,
     color: theme.colors.textSecondary,
+  },
+  feedbackThanks: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.accent,
+    fontWeight: '600',
   },
   feedbackButtons: { flexDirection: 'row', gap: theme.spacing.md },
   feedbackButton: { padding: theme.spacing.xs },

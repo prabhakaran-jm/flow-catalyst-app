@@ -34,8 +34,8 @@ interface RevenueCatContextType {
   /** Purchase a specific package (used by paywall for selected option). */
   purchasePackage: (pkg: PurchasesPackage) => Promise<void>;
   restorePurchases: () => Promise<void>;
-  /** Present RevenueCat-hosted paywall (modal). Returns true if user purchased or restored. When false, use custom /paywall if skipRevenueCat. */
-  presentPaywall: () => Promise<boolean>;
+  /** Present RevenueCat-hosted paywall (modal). Returns { unlocked, showCustomPaywall }. When showCustomPaywall is true (e.g. Error 23), show custom /paywall as fallback. */
+  presentPaywall: () => Promise<{ unlocked: boolean; showCustomPaywall: boolean }>;
   setPlanForTesting?: (plan: Plan) => void; // For testing only
 }
 
@@ -287,23 +287,25 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   /**
    * Present RevenueCat-hosted paywall (RevenueCatUI.presentPaywall).
-   * Returns true if user purchased or restored; then entitlements are refreshed.
-   * When skipRevenueCat is true, returns false so caller can show custom /paywall (Set Pro, demo).
+   * Returns { unlocked, showCustomPaywall }. When RevenueCat UI fails (e.g. Error 23), showCustomPaywall is true so caller can show custom /paywall.
    */
-  const presentPaywall = async (): Promise<boolean> => {
+  const presentPaywall = async (): Promise<{ unlocked: boolean; showCustomPaywall: boolean }> => {
     const extra = Constants.expoConfig?.extra || {};
     if (extra.skipRevenueCat) {
-      return false;
+      return { unlocked: false, showCustomPaywall: true };
     }
     try {
       const result = await presentRevenueCatPaywall();
       if (result === 'purchased' || result === 'restored') {
         await refreshEntitlements();
-        return true;
+        return { unlocked: true, showCustomPaywall: false };
       }
-      return false;
+      if (result === 'error') {
+        return { unlocked: false, showCustomPaywall: true };
+      }
+      return { unlocked: false, showCustomPaywall: false };
     } catch {
-      return false;
+      return { unlocked: false, showCustomPaywall: true };
     }
   };
 

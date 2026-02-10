@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import Constants from 'expo-constants';
@@ -14,26 +13,11 @@ const RevenueCatProvider = skipRevenueCat
   : require('@/src/providers/RevenueCatProvider').RevenueCatProvider;
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useFonts } from 'expo-font';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+SplashScreen.hideAsync();
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    // Add custom fonts here if needed
-  });
-
-  useEffect(() => {
-    if (loaded || error) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded, error]);
-
-  if (!loaded && !error) {
-    return null;
-  }
-
   return (
     <SafeAreaProvider>
       <ErrorBoundary>

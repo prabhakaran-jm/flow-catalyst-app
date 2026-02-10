@@ -37,7 +37,7 @@ export default function CreateCatalyst() {
   useEffect(() => {
     if (!authLoading && user && plan === 'free') {
       if (skipRevenueCat) router.replace('/paywall');
-      else void presentPaywall();
+      else void presentPaywall().then((r) => { if (r.showCustomPaywall) router.replace('/paywall'); });
     }
   }, [plan, authLoading, user, router, skipRevenueCat, presentPaywall]);
 
@@ -95,7 +95,10 @@ export default function CreateCatalyst() {
   const handleSave = async () => {
     if (plan === 'free') {
       if (skipRevenueCat) router.push('/paywall');
-      else await presentPaywall();
+      else {
+        const r = await presentPaywall();
+        if (r.showCustomPaywall) router.push('/paywall');
+      }
       return;
     }
 

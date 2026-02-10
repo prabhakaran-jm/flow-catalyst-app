@@ -7,12 +7,16 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useMemo } from 'react';
 import Constants from 'expo-constants';
 import { theme } from '@/theme';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
+
+const TERMS_URL = 'https://flowcatalyst.app/terms';
+const PRIVACY_URL = 'https://flowcatalyst.app/privacy';
 
 const FEATURES = [
   'All 5 coaches',
@@ -45,7 +49,7 @@ export default function Paywall() {
   const { offerings, loadingOfferings, fetchOfferings, purchasePackage, restorePurchases, plan, refreshEntitlements, setPlanForTesting } = useRevenueCat();
   const [loadingStart, setLoadingStart] = useState(false);
   const [loadingRestore, setLoadingRestore] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(1); // default Annual
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [offeringsTimedOut, setOfferingsTimedOut] = useState(false);
 
   const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat === true;
@@ -154,7 +158,7 @@ export default function Paywall() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Go Pro</Text>
-        <Text style={styles.subtitle}>Build momentum without limits.</Text>
+        <Text style={styles.subtitle}>All 5 coaches. Unlimited runs. Zero friction.</Text>
       </View>
 
       <View style={styles.features}>
@@ -261,6 +265,16 @@ export default function Paywall() {
       </TouchableOpacity>
 
       <Text style={styles.footer}>Cancel anytime.</Text>
+
+      <View style={styles.legalLinks}>
+        <TouchableOpacity onPress={() => Linking.openURL(TERMS_URL)}>
+          <Text style={styles.legalLinkText}>Terms of Service</Text>
+        </TouchableOpacity>
+        <Text style={styles.legalSeparator}>|</Text>
+        <TouchableOpacity onPress={() => Linking.openURL(PRIVACY_URL)}>
+          <Text style={styles.legalLinkText}>Privacy Policy</Text>
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Text style={styles.backButtonText}>Maybe Later</Text>
@@ -427,8 +441,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: theme.spacing.md,
   },
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+  },
+  legalLinkText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
+  },
   backButton: {
-    marginTop: theme.spacing.xl,
+    marginTop: theme.spacing.lg,
     padding: theme.spacing.md,
     alignItems: 'center',
   },
