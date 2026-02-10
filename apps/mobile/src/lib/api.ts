@@ -100,7 +100,7 @@ export async function runCatalyst({
     const hint = errorData.hint ? ` - ${errorData.hint}` : '';
     const badGatewayHint =
       response.status === 502
-        ? ' Ensure both "supabase start" and "supabase functions serve" are running (see LOCAL_SUPABASE_SETUP.md).'
+        ? ' Ensure both "supabase start" and "supabase functions serve" are running (see README or docs/QUICK_START.md).'
         : '';
     console.error('Run catalyst error:', errorData);
     throw new Error(
@@ -358,7 +358,7 @@ export async function createCatalyst(payload: {
       const hint = errorData.hint ? ` - ${errorData.hint}` : '';
       const badGatewayHint =
         response.status === 502
-          ? ' Ensure both "supabase start" and "supabase functions serve" are running (see LOCAL_SUPABASE_SETUP.md).'
+          ? ' Ensure both "supabase start" and "supabase functions serve" are running (see README or docs/QUICK_START.md).'
           : '';
       console.error('Create catalyst error:', errorData);
       throw new Error(

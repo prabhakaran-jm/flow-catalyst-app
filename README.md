@@ -238,15 +238,14 @@ While waiting for Play Store / App Store developer activation:
 
 ## Testing & Deployment
 
-- **Quick Start**: See `docs/QUICK_START.md` for immediate testing steps
-- **Testing Guide**: See `docs/STEP_BY_STEP_TESTING.md` for detailed testing walkthrough
-- **Deployment Guide**: See `docs/DEPLOYMENT_GUIDE.md` for production deployment
-- **Testing Checklist**: See `docs/TESTING_CHECKLIST.md` for comprehensive test cases
+- **Quick Start**: See `docs/QUICK_START.md` for immediate testing and deployment steps
+- **Testing Checklist**: See `docs/TESTING_CHECKLIST.md` for test cases
+- **Production Deploy**: See `docs/PRODUCTION_DEPLOY.md` for Supabase and EAS commands
+- **Shipyard iOS**: See `docs/SHIPYARD_IOS_SUBMISSION.md` for App Store submission
 
 ## Setup Guides
 
-- **Local Supabase**: See `docs/LOCAL_SUPABASE_SETUP.md`
-- **AI Integration**: See `docs/AI_INTEGRATION_SETUP.md`
+- **AI Integration**: See `docs/AI_INTEGRATION_SETUP.md` for OpenRouter/OpenAI/Anthropic
 - **RevenueCat**: See `docs/REVENUECAT_SETUP.md` for entitlement, offerings, and product setup
 
 ## License

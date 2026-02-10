@@ -142,17 +142,16 @@ curl -X POST https://your-project.supabase.co/functions/v1/create-catalyst \
 
 ## 📚 Detailed Guides
 
-- **Full Deployment**: See `DEPLOYMENT_GUIDE.md`
+- **Production Deploy**: See `PRODUCTION_DEPLOY.md`
 - **Testing Checklist**: See `TESTING_CHECKLIST.md`
 - **AI Setup**: See `AI_INTEGRATION_SETUP.md`
 - **RevenueCat Setup**: See `REVENUECAT_SETUP.md`
-- **Local Supabase**: See `LOCAL_SUPABASE_SETUP.md`
 
 ---
 
 ## 🆘 Need Help?
 
-1. Check the troubleshooting section in DEPLOYMENT_GUIDE.md
+1. See `PRODUCTION_DEPLOY.md` and `TESTING_CHECKLIST.md`
 2. Review Supabase Dashboard logs
 3. Check Edge Function logs
 4. Review Expo build logs

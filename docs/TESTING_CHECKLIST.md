@@ -279,6 +279,6 @@ Tester: _______________
 
 1. Fix any issues found
 2. Re-test fixed features
-3. Proceed to deployment (see DEPLOYMENT_GUIDE.md)
+3. Proceed to deployment (see PRODUCTION_DEPLOY.md)
 4. Set up production monitoring
 5. Prepare for App Store/Play Store submission
