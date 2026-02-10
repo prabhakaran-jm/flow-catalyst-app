@@ -15,15 +15,16 @@ import Constants from 'expo-constants';
 import { theme } from '@/theme';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
-const TERMS_URL = 'https://flowcatalyst.app/terms';
-const PRIVACY_URL = 'https://flowcatalyst.app/privacy';
+// Host legal pages at this base URL (e.g. GitHub Pages: https://YOUR-USERNAME.github.io/flow-catalyst-app)
+const LEGAL_BASE_URL = 'https://prabhakaran-jm.github.io/flow-catalyst-app';
+const TERMS_URL = `${LEGAL_BASE_URL}/terms.html`;
+const PRIVACY_URL = `${LEGAL_BASE_URL}/privacy.html`;
 
 const FEATURES = [
   'All 5 coaches',
   'Unlimited runs',
   'AI Magic Wand refinement',
   'Save to library',
-  'Create custom coaches',
 ];
 
 type PackageOption = { pkg: import('react-native-purchases').PurchasesPackage; title: string; period: string };
