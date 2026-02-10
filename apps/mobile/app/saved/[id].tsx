@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '@/theme';
 import { useAppStore } from '@/store/appStore';
 import { showAlert, showConfirm } from '@/src/lib/alert';
-import { normalizeRefineOutput } from '@/src/lib/formatOutput';
+import { normalizeRefineOutput, replacePlaceholdersInOutput } from '@/src/lib/formatOutput';
 
 export default function SavedDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,10 +32,13 @@ export default function SavedDetailScreen() {
   }, [id, hasLoaded, result, router]);
 
   const hasOutput = !!(result?.output && result.output.trim());
+  const displayOutput = hasOutput
+    ? replacePlaceholdersInOutput(result.output, result.inputs)
+    : '';
 
   const handleCopy = async () => {
     if (hasOutput) {
-      await Clipboard.setStringAsync(result.output);
+      await Clipboard.setStringAsync(displayOutput);
       setCopied(true);
       setTimeout(() => setCopied(false), 1000);
     }
@@ -43,7 +46,7 @@ export default function SavedDetailScreen() {
 
   const handleSend = async () => {
     if (hasOutput) {
-      await Share.share({ message: result.output, title: result.coachTitle });
+      await Share.share({ message: displayOutput, title: result.coachTitle });
     }
   };
 
@@ -78,7 +81,7 @@ export default function SavedDetailScreen() {
       </View>
 
       <View style={styles.outputContainer}>
-        <Markdown>{normalizeRefineOutput(result.output || '')}</Markdown>
+        <Markdown>{normalizeRefineOutput(displayOutput)}</Markdown>
       </View>
 
       <View style={styles.actions}>

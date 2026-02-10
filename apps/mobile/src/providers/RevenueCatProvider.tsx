@@ -4,6 +4,7 @@ import Purchases, { CustomerInfo, PurchasesOffering, PurchasesPackage } from 're
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { useSupabase } from './SupabaseProvider';
+import { presentRevenueCatPaywall } from '@/src/lib/presentRevenueCatPaywall';
 
 // Get RevenueCat API keys from env.ts (local) or Expo Constants (EAS build)
 function getRevenueCatApiKey(platform: 'ios' | 'android'): string | undefined {
@@ -33,6 +34,8 @@ interface RevenueCatContextType {
   /** Purchase a specific package (used by paywall for selected option). */
   purchasePackage: (pkg: PurchasesPackage) => Promise<void>;
   restorePurchases: () => Promise<void>;
+  /** Present RevenueCat-hosted paywall (modal). Returns true if user purchased or restored. When false, use custom /paywall if skipRevenueCat. */
+  presentPaywall: () => Promise<boolean>;
   setPlanForTesting?: (plan: Plan) => void; // For testing only
 }
 
@@ -84,6 +87,13 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
           return;
         }
 
+        // Debug logging in dev to troubleshoot paywall / offerings (see REVENUECAT_SETUP.md)
+        if (__DEV__ && typeof Purchases.setLogLevel === 'function') {
+          try {
+            await Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+          } catch (_) {}
+        }
+
         // Configure RevenueCat
         await Purchases.configure({ apiKey });
 
@@ -95,6 +105,31 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
         // Load initial entitlements
         await refreshEntitlements();
         setIsInitialized(true);
+        // Load offerings so paywall has pricing when opened (avoids infinite "Loading pricing…")
+        try {
+          const OFFERINGS_TIMEOUT_MS = 12000;
+          const result = await Promise.race([
+            Purchases.getOfferings(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Loading pricing timed out')), OFFERINGS_TIMEOUT_MS)
+            ),
+          ]);
+          setOfferings(result);
+          const hasCurrent = result?.current != null;
+          const pkgCount = result?.current?.availablePackages?.length ?? 0;
+          if (__DEV__) {
+            console.log('[RevenueCat] Offerings at init:', hasCurrent ? `${pkgCount} package(s)` : 'no current offering');
+          }
+          if (!hasCurrent && __DEV__) {
+            console.warn('[RevenueCat] No current offering. Check: RevenueCat Dashboard → Offerings (default) has packages; Products linked to App Store Connect / Play Console; product IDs match.');
+          }
+        } catch (offeringsError) {
+          console.error('Failed to fetch offerings at init:', offeringsError);
+          if (__DEV__) {
+            console.warn('[RevenueCat] Paywall will show "Pricing not available" / Retry. Fix: RevenueCat Dashboard (products + offering), store products, and REVENUECAT_API_KEY in EAS env.');
+          }
+          setOfferings(null);
+        }
       } catch (error) {
         console.error('Failed to initialize RevenueCat:', error);
         // Fallback to free plan on error
@@ -148,6 +183,8 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
 
   /**
    * Fetch current offerings (for paywall pricing display).
+   * No-ops until SDK is initialized; auto-called when init completes.
+   * Uses a timeout so the paywall never spins forever.
    */
   const fetchOfferings = async (): Promise<void> => {
     const extra = Constants.expoConfig?.extra || {};
@@ -156,12 +193,28 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
       setLoadingOfferings(false);
       return;
     }
+    if (!isInitialized) {
+      setLoadingOfferings(false);
+      return;
+    }
     setLoadingOfferings(true);
+    const OFFERINGS_TIMEOUT_MS = 12000;
     try {
-      const result = await Purchases.getOfferings();
+      const result = await Promise.race([
+        Purchases.getOfferings(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Loading pricing timed out')), OFFERINGS_TIMEOUT_MS)
+        ),
+      ]);
       setOfferings(result);
+      if (__DEV__ && result?.current) {
+        console.log('[RevenueCat] Offerings fetched:', result.current.availablePackages?.length ?? 0, 'packages');
+      }
     } catch (error) {
       console.error('Failed to fetch offerings:', error);
+      if (__DEV__) {
+        console.warn('[RevenueCat] Ensure: (1) Products in RevenueCat match App Store Connect / Play Console IDs (2) Offering has packages attached (3) REVENUECAT_API_KEY_IOS/ANDROID in EAS production env');
+      }
       setOfferings(null);
     } finally {
       setLoadingOfferings(false);
@@ -232,6 +285,28 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     setPlan(newPlan);
   };
 
+  /**
+   * Present RevenueCat-hosted paywall (RevenueCatUI.presentPaywall).
+   * Returns true if user purchased or restored; then entitlements are refreshed.
+   * When skipRevenueCat is true, returns false so caller can show custom /paywall (Set Pro, demo).
+   */
+  const presentPaywall = async (): Promise<boolean> => {
+    const extra = Constants.expoConfig?.extra || {};
+    if (extra.skipRevenueCat) {
+      return false;
+    }
+    try {
+      const result = await presentRevenueCatPaywall();
+      if (result === 'purchased' || result === 'restored') {
+        await refreshEntitlements();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   const value: RevenueCatContextType = {
     plan: testingOverride ?? plan,
     offerings,
@@ -241,6 +316,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     purchasePro,
     purchasePackage,
     restorePurchases,
+    presentPaywall,
     setPlanForTesting,
   };
 

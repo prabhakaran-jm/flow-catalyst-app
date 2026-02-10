@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.flowcatalyst.app",
-      "buildNumber": "1"
+      "buildNumber": "4"
     },
     "android": {
       "adaptiveIcon": {
@@ -26,7 +26,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.flowcatalyst.app",
-      "versionCode": 2
+      "versionCode": 4
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -58,9 +58,6 @@
       "REVENUECAT_API_KEY_ANDROID": "YOUR_REVENUECAT_ANDROID_API_KEY",
       "router": {
         "origin": false
-      },
-      "eas": {
-        "projectId": "1ab86178-046a-4e57-9bd7-94505216d86c"
       }
     }
   }

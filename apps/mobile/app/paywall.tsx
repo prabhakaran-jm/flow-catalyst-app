@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useMemo } from 'react';
+import Constants from 'expo-constants';
 import { theme } from '@/theme';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 
@@ -32,12 +33,33 @@ function getPackageOptions(packages: import('react-native-purchases').PurchasesP
   return options;
 }
 
+const DEMO_OPTIONS = [
+  { id: 'monthly', title: 'Monthly', period: '/month', price: 'Free for demo' },
+  { id: 'annual', title: 'Annual', period: '/year', price: 'Free for demo' },
+];
+
+const OFFERINGS_LOAD_TIMEOUT_MS = 12000;
+
 export default function Paywall() {
   const router = useRouter();
-  const { offerings, loadingOfferings, fetchOfferings, purchasePackage, restorePurchases, plan } = useRevenueCat();
+  const { offerings, loadingOfferings, fetchOfferings, purchasePackage, restorePurchases, plan, refreshEntitlements, setPlanForTesting } = useRevenueCat();
   const [loadingStart, setLoadingStart] = useState(false);
   const [loadingRestore, setLoadingRestore] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(1); // default Annual
+  const [offeringsTimedOut, setOfferingsTimedOut] = useState(false);
+
+  const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat === true;
+  const isDemoMode = skipRevenueCat && typeof setPlanForTesting === 'function';
+
+  // Client-side timeout so we never spin forever if RevenueCat hangs
+  useEffect(() => {
+    if (!loadingOfferings) {
+      setOfferingsTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setOfferingsTimedOut(true), OFFERINGS_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [loadingOfferings]);
 
   const packageOptions = useMemo(() => {
     const current = offerings?.current;
@@ -46,8 +68,9 @@ export default function Paywall() {
   }, [offerings]);
 
   useEffect(() => {
+    refreshEntitlements();
     fetchOfferings();
-  }, [fetchOfferings]);
+  }, [fetchOfferings, refreshEntitlements]);
 
   useEffect(() => {
     if (packageOptions.length > 0) {
@@ -99,6 +122,33 @@ export default function Paywall() {
   };
 
   const hasOfferings = packageOptions.length > 0;
+  const showLoadingSpinner = loadingOfferings && !offeringsTimedOut;
+  const showDemoPricing = isDemoMode && !hasOfferings && !loadingOfferings;
+  const showPricingUnavailable = !hasOfferings && (offeringsTimedOut || (!loadingOfferings && !showDemoPricing));
+
+  const handleUnlockPro = async () => {
+    if (showDemoPricing && setPlanForTesting) {
+      setLoadingStart(true);
+      setPlanForTesting('pro');
+      setLoadingStart(false);
+      Alert.alert('Demo', 'Pro unlocked for this session. No payment.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+      return;
+    }
+    await handleStartPro();
+  };
+
+  const handleRestoreOrDemo = async () => {
+    if (showDemoPricing && setPlanForTesting) {
+      setPlanForTesting('pro');
+      Alert.alert('Demo', 'Pro unlocked for this session.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+      return;
+    }
+    await handleRestore();
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -115,13 +165,44 @@ export default function Paywall() {
         ))}
       </View>
 
-      {loadingOfferings ? (
+      {showLoadingSpinner ? (
         <View style={styles.pricingLoading}>
           <ActivityIndicator size="small" color={theme.colors.accent} />
           <Text style={styles.pricingLoadingText}>Loading pricing…</Text>
         </View>
-      ) : !hasOfferings ? (
-        <Text style={styles.pricingFallback}>Pricing not available yet.</Text>
+      ) : showDemoPricing ? (
+        <View style={styles.packageOptions}>
+          {DEMO_OPTIONS.map((opt, idx) => {
+            const isSelected = selectedIndex === idx;
+            return (
+              <TouchableOpacity
+                key={opt.id}
+                style={[styles.packageOption, isSelected && styles.packageOptionSelected]}
+                onPress={() => setSelectedIndex(idx)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.packageOptionContent}>
+                  <Text style={styles.packageTitle}>{opt.title}</Text>
+                  <Text style={styles.packagePrice}>
+                    {opt.price}
+                    <Text style={styles.packagePeriod}>{opt.period}</Text>
+                  </Text>
+                </View>
+                {isSelected && <View style={styles.packageCheck} />}
+              </TouchableOpacity>
+            );
+          })}
+          <Text style={[theme.typography.bodySmall, { color: theme.colors.textSecondary, textAlign: 'center' as const, marginTop: theme.spacing.sm }]}>
+            Sandbox / demo — no real charge
+          </Text>
+        </View>
+      ) : showPricingUnavailable ? (
+        <View style={styles.pricingFallbackWrap}>
+          <Text style={styles.pricingFallback}>Pricing not available yet.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => { setOfferingsTimedOut(false); fetchOfferings(); }} disabled={loadingOfferings}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <View style={styles.packageOptions}>
           {packageOptions.map((opt, idx) => {
@@ -154,9 +235,9 @@ export default function Paywall() {
       )}
 
       <TouchableOpacity
-        style={[styles.primaryButton, (loadingStart || !hasOfferings || plan === 'pro') && styles.buttonDisabled]}
-        onPress={handleStartPro}
-        disabled={loadingStart || !hasOfferings || plan === 'pro'}
+        style={[styles.primaryButton, (loadingStart || (!hasOfferings && !showDemoPricing) || plan === 'pro') && styles.buttonDisabled]}
+        onPress={handleUnlockPro}
+        disabled={loadingStart || (!hasOfferings && !showDemoPricing) || plan === 'pro'}
       >
         {loadingStart ? (
           <ActivityIndicator color={theme.colors.background} />
@@ -169,7 +250,7 @@ export default function Paywall() {
 
       <TouchableOpacity
         style={[styles.secondaryButton, loadingRestore && styles.buttonDisabled]}
-        onPress={handleRestore}
+        onPress={handleRestoreOrDemo}
         disabled={loadingRestore || plan === 'pro'}
       >
         {loadingRestore ? (
@@ -239,12 +320,26 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.textSecondary,
   },
+  pricingFallbackWrap: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
   pricingFallback: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
     textAlign: 'center',
-    paddingVertical: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  retryButton: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.xs,
+  },
+  retryButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.accent,
+    fontWeight: '600',
   },
   packageOptions: {
     gap: theme.spacing.sm,

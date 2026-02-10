@@ -115,6 +115,59 @@ See **iOS integration (step-by-step)** above. Summary: create a subscription gro
 - Use Test Navigation **Set Pro** for quick testing without store setup
 - See `docs/REVENUECAT_TESTING.md` for sandbox testing
 
+## RevenueCat UI (hosted paywall)
+
+The app uses [RevenueCat UI](https://www.revenuecat.com/docs/tools/paywalls/displaying-paywalls) when RevenueCat is enabled (production builds):
+
+- **`presentPaywall()`** – Opens RevenueCat’s hosted paywall as a modal. Used when the user taps “Upgrade”, “Create Coach”, or a Pro-only coach and doesn’t have the `pro` entitlement. On purchase or restore, entitlements are refreshed and the user gets Pro.
+- **Custom `/paywall` screen** – Still used when **skipRevenueCat** is true (preview/development builds) so testers can use “Set Pro” / “Free for demo” without the store.
+
+So in production, the flow is: tap upgrade → RevenueCat modal with pricing → purchase/restore → Pro unlocked. No manual “Loading pricing” screen; RevenueCat UI handles loading and display.
+
+**Paywall linked to offering:** On the offering detail page (Product catalog → Offerings → **default**), the **Paywall** tab may show "No paywall is linked to this offering". That's OK: RevenueCat still shows a **default paywall** (lists all packages). To use a custom design and copy, click **Add Paywall** (or the Paywall tab), create a paywall in the Paywalls editor, and link it to the **default** offering.
+
+## Paywall troubleshooting (pricing not loading / Unlock Pro disabled)
+
+Goal: **Pricing shows → user taps Monthly or Yearly → store sheet opens → after purchase, Pro unlocks** (same as a working submission).
+
+### Checklist
+
+1. **RevenueCat Dashboard**
+   - **Apps:** iOS app with bundle ID `com.flowcatalyst.app` (and Android if you ship Android). Shared Secret (iOS) set.
+   - **Products:** Product IDs match the store exactly: e.g. `flow_catalyst_monthly`, `flow_catalyst_annual`.
+   - **Offerings:** The **Current** offering (e.g. **default**) has at least two packages (e.g. `$rc_monthly`, `$rc_annual`), each linked to the correct product. If the offering’s **Paywall** tab says "No paywall is linked", the SDK still shows a default paywall; use **Add Paywall** only if you want a custom design.
+   - **Entitlements:** Entitlement identifier is **`pro`** (matches the app code).
+
+2. **App Store Connect (iOS)**
+   - **Monetization → Subscriptions:** Subscription group exists; subscriptions with IDs `flow_catalyst_monthly` and `flow_catalyst_annual` exist and have a price.
+   - **App version (e.g. 1.0):** In-App Purchases section shows both subscriptions attached.
+   - **Agreements:** Paid apps agreement and bank/tax forms completed if required.
+
+3. **Google Play (Android, if used)**
+   - **Monetize → Subscriptions:** Monthly and annual products created with the same IDs as in RevenueCat.
+   - App at least in **internal testing** so Play Billing can resolve products.
+
+4. **API keys in the build**
+   - **Production EAS build:** EAS Dashboard → your project → Environment variables → **production** → `REVENUECAT_API_KEY_IOS` (and `REVENUECAT_API_KEY_ANDROID` for Android) set to the **public** app-specific key (e.g. `appl_...` for iOS). Rebuild after changing env vars.
+   - **Local/dev:** `apps/mobile/src/env.ts` (or env.example) has the same keys so the paywall can load offerings in dev.
+
+5. **Testing**
+   - **iOS:** Use a **Sandbox** Apple ID (App Store Connect → Users and Access → Sandbox → Testers). On device: Settings → App Store → Sandbox Account → sign in. Then open the app, go to paywall, tap a subscription; the sandbox purchase sheet should appear and no real charge.
+   - **Android:** Add license testers in Play Console; use a test card in the purchase flow.
+
+### Debug logs
+
+In development, the app enables RevenueCat **debug** logging and prints hints when offerings fail:
+
+- Run the app from the repo (e.g. `npx expo start` or a dev build) and open the paywall.
+- Watch Metro (or device logs) for `[RevenueCat]` messages: they indicate whether offerings loaded or why they might have failed.
+- Fix any misconfig (product IDs, offering packages, API key) then try again; use **Retry** on the paywall to refetch offerings.
+
+### If it still fails
+
+- Confirm you are testing on a **production** (or at least store-signed) build with the correct EAS production env vars. Preview/dev builds use `skipRevenueCat` and will not load real offerings.
+- Ensure the build’s bundle ID / package name matches the app in RevenueCat and in App Store Connect / Play Console.
+
 ## 6. Server-Side Pro Bypass (Optional)
 
 The `profiles.plan` column controls server-side rate limiting. Pro users skip the 3/day limit.

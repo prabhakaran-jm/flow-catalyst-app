@@ -42,7 +42,7 @@ function CoachIcon({ coachId }: { coachId: string }) {
 export default function Index() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { plan, setPlanForTesting } = useRevenueCat();
+  const { plan, setPlanForTesting, presentPaywall } = useRevenueCat();
   const { user, loading, signOut } = useSupabase();
   const { savedResults, loadSavedResults, deleteSavedResult } = useAppStore();
   const [catalysts, setCatalysts] = useState<Catalyst[]>([]);
@@ -76,17 +76,22 @@ export default function Index() {
     setRefreshing(false);
   }, [loadCatalysts]);
 
-  const handleCreatePress = () => {
+  const handleCreatePress = async () => {
     if (!user) {
       showAlert('Sign in to create', 'Sign in to save and create your own coaches.');
       router.push('/signin');
       return;
     }
-    if (plan === 'free' && !skipRevenueCat) {
-      router.push('/paywall');
-    } else {
-      router.push('/catalyst/create');
+    if (plan === 'free') {
+      if (skipRevenueCat) {
+        router.push('/paywall');
+        return;
+      }
+      const unlocked = await presentPaywall();
+      if (unlocked) router.push('/catalyst/create');
+      return;
     }
+    router.push('/catalyst/create');
   };
 
   const handleSignOut = async () => {
@@ -95,27 +100,37 @@ export default function Index() {
     router.replace('/signin');
   };
 
-  const handleBuiltInCoachPress = (coachId: BuiltInCoachId) => {
+  const handleBuiltInCoachPress = async (coachId: BuiltInCoachId) => {
     const coach = BUILT_IN_COACHES.find((c) => c.id === coachId);
     if (!coach) return;
-    if (coach.proOnly && plan === 'free' && !skipRevenueCat) {
-      router.push('/paywall');
-    } else {
-      router.push(`/catalyst/builtin-${coachId}`);
+    if (coach.proOnly && plan === 'free') {
+      if (skipRevenueCat) {
+        router.push('/paywall');
+        return;
+      }
+      const unlocked = await presentPaywall();
+      if (unlocked) router.push(`/catalyst/builtin-${coachId}`);
+      return;
     }
+    router.push(`/catalyst/builtin-${coachId}`);
   };
 
-  const handleCatalystPress = (catalystId: string) => {
+  const handleCatalystPress = async (catalystId: string) => {
     if (!user) {
       showAlert('Sign in to run', 'Sign in to run your saved coaches.');
       router.push('/signin');
       return;
     }
-    if (plan === 'free' && !skipRevenueCat) {
-      router.push('/paywall');
-    } else {
-      router.push(`/catalyst/${catalystId}`);
+    if (plan === 'free') {
+      if (skipRevenueCat) {
+        router.push('/paywall');
+        return;
+      }
+      const unlocked = await presentPaywall();
+      if (unlocked) router.push(`/catalyst/${catalystId}`);
+      return;
     }
+    router.push(`/catalyst/${catalystId}`);
   };
 
   const handleEditPress = (e: any, catalystId: string) => {
@@ -409,10 +424,17 @@ export default function Index() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.testNavButton, catalysts.length === 0 && styles.testNavButtonDisabled]}
-              onPress={() => {
+              onPress={async () => {
                 if (catalysts.length === 0) return;
-                if (plan === 'free') router.push('/paywall');
-                else router.push(`/catalyst/${catalysts[0].id}`);
+                if (plan === 'free') {
+                  if (skipRevenueCat) router.push('/paywall');
+                  else {
+                    const unlocked = await presentPaywall();
+                    if (unlocked) router.push(`/catalyst/${catalysts[0].id}`);
+                  }
+                } else {
+                  router.push(`/catalyst/${catalysts[0].id}`);
+                }
               }}
               disabled={catalysts.length === 0}
             >

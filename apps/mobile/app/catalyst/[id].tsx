@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Constants from 'expo-constants';
 import { theme } from '@/theme';
 import { runCatalyst, runBuiltInCoach, fetchCatalyst, deleteCatalyst, fetchProfile, Catalyst, refineBuiltInCoach, type RefineCoachQuestion } from '@/src/lib/api';
@@ -26,7 +26,7 @@ import { useSupabase } from '@/src/providers/SupabaseProvider';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 import { useAppStore } from '@/store/appStore';
 import { getBuiltInCoach, type BuiltInCoachId } from '@/src/lib/coaches';
-import { normalizeRefineOutput } from '@/src/lib/formatOutput';
+import { normalizeRefineOutput, replacePlaceholdersInOutput } from '@/src/lib/formatOutput';
 import { getTodayRunCount, incrementRunCount, hasReachedDailyLimit } from '@/src/lib/runLimits';
 import Markdown from 'react-native-markdown-display';
 import MagicWandButton from '@/src/components/MagicWandButton';
@@ -45,7 +45,7 @@ export default function CatalystDetail() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { loading: authLoading, user } = useSupabase();
-  const { plan } = useRevenueCat();
+  const { plan, presentPaywall } = useRevenueCat();
   const { anonymousRunsUsed, loadAnonymousRunsUsed, incrementAnonymousRunsUsed, hasSeenProfileNudge, setHasSeenProfileNudge, loadHasSeenProfileNudge, loadSavedResults, saveResult } = useAppStore();
 
   const builtInId = id ? getBuiltInIdFromParam(id) : null;
@@ -219,7 +219,8 @@ export default function CatalystDetail() {
     }
 
     if (mustUpgrade) {
-      router.push('/paywall');
+      if (skipRevenueCat) router.push('/paywall');
+      else await presentPaywall();
       return;
     }
 
@@ -229,15 +230,16 @@ export default function CatalystDetail() {
         router.push('/signin');
         return;
       }
-      if (user && plan === 'free' && isProOnlyCoach && !skipRevenueCat) {
-        router.push('/paywall');
+      if (user && plan === 'free' && isProOnlyCoach) {
+        if (skipRevenueCat) router.push('/paywall');
+        else await presentPaywall();
         return;
       }
       if (user && plan === 'free' && !skipRevenueCat) {
         const reached = await hasReachedDailyLimit();
         if (reached) {
           showAlert('Daily limit reached', 'Upgrade to Pro for unlimited runs.');
-          router.push('/paywall');
+          await presentPaywall();
           return;
         }
       } else if (!user && anonymousRunsUsed >= 1) {
@@ -252,7 +254,7 @@ export default function CatalystDetail() {
         return;
       }
       if (plan === 'free' && !skipRevenueCat) {
-        router.push('/paywall');
+        await presentPaywall();
         return;
       }
     }
@@ -317,7 +319,8 @@ export default function CatalystDetail() {
       setError(msg);
       if (msg.includes('Daily limit reached')) {
         showAlert('Daily limit reached', 'Upgrade to Pro for unlimited runs.');
-        router.push('/paywall');
+        if (skipRevenueCat) router.push('/paywall');
+        else await presentPaywall();
       }
     } finally {
       setLoading(false);
@@ -343,7 +346,8 @@ export default function CatalystDetail() {
     const count = useAppStore.getState().savedResults.length;
     if (plan === 'free' && count >= 10) {
       showAlert('Pro keeps everything.', 'Upgrade to save more.');
-      router.push('/paywall');
+      if (skipRevenueCat) router.push('/paywall');
+      else await presentPaywall();
       return;
     }
     try {
@@ -426,6 +430,27 @@ export default function CatalystDetail() {
 
   const builtInInputs = buildInputsForBuiltIn();
   const allInputs = isBuiltIn ? builtInInputs : inputs;
+
+  // Inputs used when displaying output (include lever for built-in so {{tried}} etc. get replaced)
+  const displayInputsForOutput = React.useMemo(() => {
+    if (isBuiltIn && builtInCoach) {
+      const lerp = (a: string, b: string, t: number) => {
+        if (t <= 0) return a;
+        if (t >= 1) return b;
+        return `${a} (${Math.round(t * 100)}% toward ${b})`;
+      };
+      return {
+        ...builtInInputs,
+        [builtInCoach.lever.name]: lerp(
+          builtInCoach.lever.minLabel,
+          builtInCoach.lever.maxLabel,
+          leverValue / 100
+        ),
+      };
+    }
+    return inputs;
+  }, [isBuiltIn, builtInCoach, builtInInputs, leverValue, inputs]);
+
   const hasRequiredInputs = isBuiltIn
     ? builtInCoach!.slots.every((s) => !s.required || (s.required && builtInInputs[s.name]?.trim()))
     : Object.keys(inputs).length > 0;
@@ -473,7 +498,13 @@ export default function CatalystDetail() {
           <Text style={styles.limitWarningText}>
             Upgrade to Pro to use this coach.
           </Text>
-          <TouchableOpacity style={styles.upgradeButton} onPress={() => router.push('/paywall')}>
+          <TouchableOpacity
+            style={styles.upgradeButton}
+            onPress={async () => {
+              if (skipRevenueCat) router.push('/paywall');
+              else await presentPaywall();
+            }}
+          >
             <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
           </TouchableOpacity>
         </View>
@@ -657,7 +688,7 @@ export default function CatalystDetail() {
           <Text style={styles.sectionTitle}>Guidance</Text>
           <View style={styles.outputHeroCard}>
             <Markdown style={markdownStyles} debugPrintTree={false}>
-              {normalizeRefineOutput(output)}
+              {normalizeRefineOutput(replacePlaceholdersInOutput(output, displayInputsForOutput))}
             </Markdown>
           </View>
           <View style={styles.resultActions}>

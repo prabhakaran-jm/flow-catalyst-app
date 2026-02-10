@@ -1,4 +1,24 @@
 /**
+ * Replace any {{key}} or {key} in AI output with actual input values.
+ * Fixes cases where the model echoes placeholders (e.g. Block Breaker "{{tried}}").
+ */
+export function replacePlaceholdersInOutput(
+  text: string,
+  inputs: Record<string, unknown> | null | undefined
+): string {
+  if (!inputs || typeof inputs !== 'object') return text;
+  let out = text;
+  for (const [key, value] of Object.entries(inputs)) {
+    const str = value != null ? String(value).trim() : '';
+    const placeholder1 = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+    const placeholder2 = new RegExp(`\\{${key}\\}`, 'g');
+    out = out.replace(placeholder1, str);
+    out = out.replace(placeholder2, str);
+  }
+  return out;
+}
+
+/**
  * Shared formatting for AI output (refine, run output).
  * Ensures bullets, headings, bold, and line breaks display correctly.
  */

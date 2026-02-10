@@ -9,6 +9,9 @@
  */
 const base = require('./app.json');
 
+// EAS project ID (set by eas init; required for OTA updates URL)
+const EAS_PROJECT_ID = base.expo?.extra?.eas?.projectId ?? 'bb279f38-3c73-4c25-b048-f23d751b6ce4';
+
 module.exports = {
   ...base,
   expo: {
@@ -41,7 +44,7 @@ module.exports = {
       'expo-font',
     ],
     updates: {
-      url: 'https://u.expo.dev/1ab86178-046a-4e57-9bd7-94505216d86c',
+      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
       checkAutomatically: 'NEVER', // Avoid launch crashes; use manual update checks
     },
     runtimeVersion: {
@@ -49,6 +52,7 @@ module.exports = {
     },
     extra: {
       ...base.expo.extra,
+      eas: { projectId: EAS_PROJECT_ID },
       // Skip RevenueCat on preview/internal builds - SDK can crash when app is sideloaded (not from Play Store)
       skipRevenueCat: process.env.EAS_BUILD_PROFILE === 'preview' || process.env.EAS_BUILD_PROFILE === 'development',
       // Show Test Navigation (Set Pro/Set Free) in dev, preview, or when explicitly enabled

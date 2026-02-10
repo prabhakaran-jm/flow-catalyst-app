@@ -25,7 +25,7 @@ import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 export default function CreateCatalyst() {
   const router = useRouter();
   const { loading: authLoading, user } = useSupabase();
-  const { plan } = useRevenueCat();
+  const { plan, presentPaywall } = useRevenueCat();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -35,10 +35,11 @@ export default function CreateCatalyst() {
 
   const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
   useEffect(() => {
-    if (!authLoading && user && plan === 'free' && !skipRevenueCat) {
-      router.replace('/paywall');
+    if (!authLoading && user && plan === 'free') {
+      if (skipRevenueCat) router.replace('/paywall');
+      else void presentPaywall();
     }
-  }, [plan, authLoading, user, router, skipRevenueCat]);
+  }, [plan, authLoading, user, router, skipRevenueCat, presentPaywall]);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -92,8 +93,9 @@ export default function CreateCatalyst() {
   );
 
   const handleSave = async () => {
-    if (plan === 'free' && !skipRevenueCat) {
-      router.push('/paywall');
+    if (plan === 'free') {
+      if (skipRevenueCat) router.push('/paywall');
+      else await presentPaywall();
       return;
     }
 
