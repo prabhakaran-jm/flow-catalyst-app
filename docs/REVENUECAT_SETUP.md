@@ -193,29 +193,82 @@ In development, the app enables RevenueCat **debug** logging and prints hints wh
 
 ### Error 23: "There is an issue with your configuration"
 
-When RevenueCat UI shows a popup **"Error 23: There is an issue with your configuration"**, it means **products in RevenueCat could not be fetched from the App Store** (or Play Store).
+When RevenueCat UI shows **"Error 23: There is an issue with your configuration"**, it means RevenueCat got the offerings from its API (steps 1–2), but when the SDK asked Apple/Google for the actual product details, the **store rejected the request** (steps 3–4). RevenueCat has no visibility into that store error—it’s almost always a **platform configuration** issue.
 
-**Behavior:**
-1. The user sees the error popup.
-2. After dismissing it, the app **falls back to the custom paywall screen** (`/paywall`).
-3. The custom paywall may show "Pricing not available" with a **Retry** button.
+**Behavior:** User sees the error popup → app falls back to the custom paywall (`/paywall`) → custom paywall may show "Pricing not available" and **Retry**.
 
-**Fix the configuration:**
+**Identifiers this app expects:**
 
-1. **App Store Connect**
-   - **Agreements:** Ensure the "Paid Apps" agreement is signed and bank/tax info is active.
-   - **Subscriptions:** Must be "Ready to Submit" or "Approved".
-   - **Products:** Both `flow_catalyst_monthly` and `flow_catalyst_annual` must be attached to the specific App Version (e.g. 1.0) you are testing.
-   - **Bundle ID:** Must match exactly across Expo (`app.json`), RevenueCat, and App Store Connect.
+| Layer | Identifier | Where to check |
+|--------|-------------|-----------------|
+| Store product IDs | `flow_catalyst_monthly`, `flow_catalyst_annual` | App Store Connect / Google Play Console |
+| RevenueCat entitlement | `pro` | RevenueCat Dashboard → Entitlements |
+| RevenueCat packages | `$rc_monthly`, `$rc_annual` | RevenueCat Dashboard → Offerings → default |
+| Bundle ID | `com.flowcatalyst.app` | App Store Connect + RevenueCat app config |
 
-2. **RevenueCat Dashboard**
-   - **Products:** Product IDs must match App Store Connect exactly.
-   - **Offering:** The **Current** offering must have packages (`$rc_monthly`, etc.) attached to these products.
-   - **API Key:** Ensure the app is using the **Public** iOS API key (`appl_...`).
+---
 
-3. **Device / Environment**
-   - **Real Device:** StoreKit often fails on Simulators. Test on a physical device.
-   - **Sandbox User:** In iOS Settings > App Store > Sandbox Account, sign in with a dedicated Sandbox Tester account (not your main Apple ID).
+#### App Store Connect (iOS)
+
+1. **Paid Applications Agreement signed?**
+   - App Store Connect → **Agreements, Tax, and Banking** → "Paid Apps" must be **active (green)**.  
+   - This is the **#1 cause of Error 23**—without it, Apple blocks all product lookups.
+
+2. **Products exist and are in the right state?**
+   - App Store Connect → Your App → **Monetization** → **Subscriptions**.
+   - Two products with exactly: `flow_catalyst_monthly`, `flow_catalyst_annual`.
+   - Status must be **"Ready to Submit"** or **"Approved"**—not "Missing Metadata" or "Developer Action Needed".
+   - Each needs: display name, description, price, review screenshot, review notes.
+
+3. **Subscription group configured?**
+   - Both products in the **same subscription group**; group must have a localization (display name).
+
+4. **Bundle ID matches?**
+   - App Store Connect app bundle ID must be exactly **`com.flowcatalyst.app`**, and match RevenueCat Dashboard → Apps → iOS app configuration.
+
+5. **Sandbox tester configured?**
+   - App Store Connect → **Users and Access** → **Sandbox** → **Sandbox Testers** (at least one).
+   - On device: **Settings → App Store → Sandbox Account** (iOS 16+) must be signed in with that account.
+
+---
+
+#### Google Play Console (Android)
+
+1. **Products created?**  
+   Monetize → Products → Subscriptions: `flow_catalyst_monthly`, `flow_catalyst_annual`, each with at least one base plan.
+
+2. **App on a testing track?**  
+   App must be published to at least **internal testing** before products resolve. Testing → Internal testing → upload an AAB.
+
+3. **License testers added?**  
+   Settings → License testing → add your Google account email.
+
+---
+
+#### RevenueCat Dashboard
+
+1. **Products linked correctly?**  
+   Products → both store product IDs listed with **green checkmark** (validated by the store). Yellow/red = store hasn’t accepted that ID.
+
+2. **Offerings configured?**  
+   Offerings → **"default"** exists and is **Current**; contains `$rc_monthly` → `flow_catalyst_monthly`, `$rc_annual` → `flow_catalyst_annual`.
+
+3. **Entitlement wired?**  
+   Entitlements → **`pro`** exists; both products attached to `pro`.
+
+4. **API key correct?**  
+   Project Settings → API Keys: iOS `appl_...`, Android `goog_...`, matching EAS environment variables.
+
+---
+
+#### Quick diagnostic
+
+With RevenueCat debug logging (e.g. `Purchases.setLogLevel(DEBUG)` in dev), look for:
+
+- `[Purchases] - INFO: Offerings fetched successfully` ← RevenueCat step OK  
+- `[Purchases] - ERROR: Error fetching products` ← store step failed  
+
+If you see "Offerings fetched" but "Error fetching products", confirm: product IDs match character-for-character in the store; products are not stuck in "Missing Metadata"; Paid Apps agreement is signed (iOS) or app is on a testing track (Android).
 
 ### Pricing not loading (Infinite Spinner)
 

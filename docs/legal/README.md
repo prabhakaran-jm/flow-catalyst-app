@@ -10,6 +10,7 @@ This folder contains legal documents and data handling documentation for Flow Ca
 |----------|---------|
 | [PRIVACY_POLICY.md](./PRIVACY_POLICY.md) | Privacy policy for app stores and website |
 | [TERMS_OF_SERVICE.md](./TERMS_OF_SERVICE.md) | Terms of service (if you plan to enforce them) |
+| [SUPPORT.md](./SUPPORT.md) | Support contact and help (use as App Store Support URL) |
 | [DATA_HANDLING.md](./DATA_HANDLING.md) | Technical summary of data flows and third-party services |
 
 ---
@@ -29,11 +30,20 @@ If you don’t have a domain like flowcatalyst.app yet, you can host the legal p
 
 When you get a real domain (e.g. flowcatalyst.app), upload the same `terms.html` and `privacy.html` there and change `LEGAL_BASE_URL` to `https://flowcatalyst.app` (and use paths like `/terms` and `/privacy` if your host supports it).
 
+**Support URL (App Store Connect):** Use the GitHub URL to the support page so it’s a live link:
+
+- **If the repo is on GitHub:**  
+  `https://github.com/YOUR_USERNAME/flow-catalyst-app/blob/main/docs/legal/SUPPORT.md`  
+  (Replace `YOUR_USERNAME` with your GitHub username. GitHub renders the Markdown.)
+- **If you use GitHub Pages from /docs:**  
+  Add a `support.html` in `docs/` (or link to the repo) and use e.g.  
+  `https://YOUR_USERNAME.github.io/flow-catalyst-app/support.html` if you add that page.
+
 ---
 
 ## Before Publishing
 
-1. **Replace placeholders** in PRIVACY_POLICY.md, TERMS_OF_SERVICE.md, and in **docs/terms.html** and **docs/privacy.html**:
+1. **Replace placeholders** in PRIVACY_POLICY.md, TERMS_OF_SERVICE.md, **SUPPORT.md**, and in **docs/terms.html** and **docs/privacy.html**:
    - `[DATE]` → e.g., January 29, 2026
    - `[SUPPORT_EMAIL]` → your support email
    - `[JURISDICTION]` and `[COURTS]` in Terms → your governing law

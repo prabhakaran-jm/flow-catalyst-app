@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Flow Catalyst**  
-Last updated: [DATE]
+Last updated: 10/02/2026
 
 This Privacy Policy describes how Flow Catalyst ("we," "our," or "us") collects, uses, and shares information when you use our mobile application.
 
@@ -82,7 +82,7 @@ This Privacy Policy describes how Flow Catalyst ("we," "our," or "us") collects,
 - **Deletion** – Request account and data deletion
 - **Opt-out** – Uninstall the app to stop data collection
 
-To exercise these rights, contact us at: **[SUPPORT_EMAIL]**
+To exercise these rights, contact us at: **prabhakaran.jm@gmail.com**
 
 ---
 
@@ -106,4 +106,4 @@ We may update this policy. Material changes will be communicated via the app or 
 
 ## 9. Contact
 
-For privacy questions or requests: **[SUPPORT_EMAIL]**
+For privacy questions or requests: **prabhakaran.jm@gmail.com**

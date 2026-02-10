@@ -86,6 +86,35 @@ Or via CLI:
 5. **Submit for Review** (the app version with the subscriptions).  
    First subscription must be submitted with an app version. Once the version is “Waiting for Review”, sandbox can usually return products; after approval they are fully available.
 
+### Resolving "Add for Review" errors
+
+When **Add for Review** is disabled, fix each item below.
+
+**A. App Information** (left sidebar → **General** → **App Information**)
+
+| Item | Action |
+|------|--------|
+| **Content Rights** | Set up Content Rights (confirm you have rights to the app content). |
+| **Age rating** | Answer the age ratings questionnaire (e.g. no objectionable content → typically 4+ or 12+). |
+| **Primary category** | Choose one (e.g. **Productivity** or **Lifestyle**). |
+
+**B. Version page (1.0) – English (U.S.)**
+
+| Field | Example / requirement |
+|-------|------------------------|
+| **Support URL** | A working URL (e.g. your GitHub Pages legal base, or your repo URL). |
+| **Keywords** | Comma-separated, no spaces after commas; e.g. `AI,coaching,productivity,writing,outline,hook`. |
+| **Description** | Full app description (see [store-assets/descriptions.md](../store-assets/descriptions.md)). |
+
+**C. Screenshots**
+
+| Device | Requirement |
+|--------|-------------|
+| **6.5" iPhone** | At least 1 screenshot (e.g. 1242×2688 or 1284×2778 px). Up to 10. |
+| **13" iPad** | At least 1 screenshot for iPad. |
+
+Capture from a **production** build (no Test Navigation). Suggested: Home → Coach run → Paywall. See [store-assets/README.md](../store-assets/README.md) for specs.
+
 ---
 
 ## 3. Build and upload (EAS)
