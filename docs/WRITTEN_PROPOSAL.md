@@ -6,7 +6,7 @@ Productivity-focused creators don't struggle with ideas.
 
 They struggle with execution.
 
-Generic advice and open-ended AI chat tools create more thinking, not more action. Creators need focused, contextual guidance at the exact moment they're stuck — not another blank prompt box.
+Generic advice and open-ended AI chat tools create more thinking, not more action. Creators need focused, contextual guidance at the exact moment they're stuck - not another blank prompt box.
 
 Simon's audience builds systems. They value clarity, minimal design, and tools that reduce friction.
 
@@ -107,7 +107,7 @@ The value proposition is clear:
 > If you rely on this tool to ship consistently, Pro removes all friction.
 
 The subscription is positioned around momentum and consistency.  
-For creators who publish weekly or daily, removing generation limits and unlocking custom coaches turns Flow Catalyst into a reusable productivity system — not a one-time tool.  
+For creators who publish weekly or daily, removing generation limits and unlocking custom coaches turns Flow Catalyst into a reusable productivity system - not a one-time tool.  
 
 ## Why Simon @BetterCreating
 
