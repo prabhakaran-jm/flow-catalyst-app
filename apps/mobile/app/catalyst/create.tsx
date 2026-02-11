@@ -139,7 +139,7 @@ export default function CreateCatalyst() {
         inputs_json: parsedInputs,
         prompt_template: promptTemplate.trim(),
       });
-      showAlert('Success', 'Coach created successfully!', () => router.back());
+      showAlert('Success', 'Coach created successfully!', () => router.replace('/coaches' as any));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create catalyst';
       setError(errorMessage);

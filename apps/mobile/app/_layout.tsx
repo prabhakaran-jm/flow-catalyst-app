@@ -47,6 +47,7 @@ export default function RootLayout() {
               <Stack.Screen name="profile" options={{ title: 'Edit Profile' }} />
               <Stack.Screen name="catalyst/[id]" options={{ title: 'Coach' }} />
               <Stack.Screen name="catalyst/[id]/edit" options={{ title: 'Edit Coach' }} />
+              <Stack.Screen name="coaches" options={{ title: 'Coaches' }} />
               <Stack.Screen name="catalyst/create" options={{ title: 'Create Coach' }} />
               <Stack.Screen name="paywall" options={{ title: 'Upgrade' }} />
             </Stack>

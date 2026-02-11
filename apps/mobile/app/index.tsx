@@ -55,7 +55,7 @@ function CoachIcon({ coachId }: { coachId: string }) {
 export default function Index() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { plan, presentPaywall } = useRevenueCat();
+  const { plan } = useRevenueCat();
   const { user, loading, signOut } = useSupabase();
   const { hasCompletedOnboarding, onboardingLoaded, loadHasCompletedOnboarding } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,21 +94,16 @@ export default function Index() {
     router.push(`/catalyst/builtin-${coachId}`);
   };
 
-  const handleCreatePress = async () => {
+  const handleCoachesPress = () => {
     if (!user) {
       router.push('/signin');
       return;
     }
     if (plan === 'free') {
-      if (skipRevenueCat) {
-        router.push('/paywall');
-        return;
-      }
-      // Navigate to custom paywall so user always sees pricing (RevenueCat UI can hang on Android)
       router.push('/paywall');
       return;
     }
-    router.push('/catalyst/create');
+    router.push('/coaches' as any);
   };
 
   const searchLower = searchQuery.trim().toLowerCase();
@@ -137,8 +132,8 @@ export default function Index() {
       <View style={styles.header}>
         <Text style={styles.title}>Choose Your Coach</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={handleCreatePress} style={styles.profileButton}>
-            <Text style={styles.profileButtonText}>Create</Text>
+          <TouchableOpacity onPress={handleCoachesPress} style={styles.profileButton}>
+            <Text style={styles.profileButtonText}>Coaches</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/saved' as any)} style={styles.profileButton}>
             <Text style={styles.profileButtonText}>Saved</Text>
