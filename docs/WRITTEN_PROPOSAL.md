@@ -109,6 +109,27 @@ The value proposition is clear:
 The subscription is positioned around momentum and consistency.  
 For creators who publish weekly or daily, removing generation limits and unlocking custom coaches turns Flow Catalyst into a reusable productivity system - not a one-time tool.  
 
+## Roadmap
+
+If selected or continued post-hackathon:
+
+**Near-term (1–2 months)**  
+- Web app for desktop creators who write in browsers  
+- Additional built-in coaches (e.g. Script Coach, Teaser Coach) based on user feedback  
+- Export to Notion, Substack, or clipboard with one tap  
+
+**Medium-term (3–6 months)**  
+- Template marketplace: share or discover custom coaches from other creators  
+- Run history and refinement tracking: revisit past outputs and iterations  
+- Analytics for Pro users: which coaches drive the most momentum  
+
+**Long-term**  
+- Team plans for studios and small creator teams  
+- Integrations with publishing platforms (Newsletter, YouTube descriptions)  
+- Offline mode: cached outputs when connectivity is limited  
+
+The focus remains minimal UX and fast execution - each addition must reduce friction, not add complexity.
+
 ## Why Simon @BetterCreating
 
 Simon's audience values:
