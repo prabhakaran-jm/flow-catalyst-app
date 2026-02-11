@@ -10,6 +10,7 @@ import {
   Platform,
   Vibration,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -74,6 +75,11 @@ export default function CreateCatalyst() {
           }
           if (field === 'name') setName(newText);
           else if (field === 'description') setDescription(newText);
+          if (Platform.OS !== 'web') {
+            try {
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (_) {}
+          }
         } catch (err) {
           console.error('AI Magic Wand failed:', err);
           showAlert('Refinement failed', err instanceof Error ? err.message : 'Please try again');

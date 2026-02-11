@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -155,6 +156,11 @@ export default function CatalystDetail() {
           return next;
         });
         setRefineQuestions(questions ?? []);
+        if (Platform.OS !== 'web') {
+          try {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch (_) {}
+        }
       } catch (err) {
         console.error('Magic Wand failed:', err);
         showAlert('Refinement failed', err instanceof Error ? err.message : 'Try again');

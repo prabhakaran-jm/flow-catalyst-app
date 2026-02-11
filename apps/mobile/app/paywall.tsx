@@ -8,9 +8,11 @@ import {
   Alert,
   Platform,
   Linking,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { theme } from '@/theme';
@@ -23,6 +25,7 @@ const PRIVACY_URL = `${LEGAL_BASE_URL}/privacy.html`;
 
 const FEATURES = [
   'All 5 coaches',
+  'Create Coach',
   'Unlimited runs',
   'AI Magic Wand refinement',
   'Save to library',
@@ -53,6 +56,8 @@ export default function Paywall() {
   const [loadingRestore, setLoadingRestore] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [offeringsTimedOut, setOfferingsTimedOut] = useState(false);
+  const [showSuccessCelebration, setShowSuccessCelebration] = useState(false);
+  const celebrationScale = useRef(new Animated.Value(0)).current;
 
   const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat === true;
   const isDemoMode = skipRevenueCat && typeof setPlanForTesting === 'function';
@@ -98,9 +103,33 @@ export default function Paywall() {
       } else {
         throw new Error('No package selected');
       }
-      Alert.alert('Success', 'Subscription activated!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      if (Platform.OS !== 'web') {
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (_) {}
+      }
+      celebrationScale.setValue(0);
+      setShowSuccessCelebration(true);
+      Animated.sequence([
+        Animated.spring(celebrationScale, {
+          toValue: 1.2,
+          useNativeDriver: true,
+          friction: 6,
+          tension: 100,
+        }),
+        Animated.spring(celebrationScale, {
+          toValue: 1,
+          useNativeDriver: true,
+          friction: 6,
+          tension: 100,
+        }),
+      ]).start();
+      setTimeout(() => {
+        setShowSuccessCelebration(false);
+        Alert.alert('Success', 'Subscription activated!', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }, 1200);
     } catch (error) {
       console.error('Purchase error:', error);
       const msg = error instanceof Error ? error.message : 'Failed to complete purchase.';
@@ -120,6 +149,11 @@ export default function Paywall() {
     try {
       setLoadingRestore(true);
       await restorePurchases();
+      if (Platform.OS !== 'web') {
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (_) {}
+      }
       Alert.alert('Success', 'Purchase restored!', [
         { text: 'OK', onPress: () => router.back() },
       ]);
@@ -151,6 +185,11 @@ export default function Paywall() {
   const handleRestoreOrDemo = async () => {
     if (showDemoPricing && setPlanForTesting) {
       setPlanForTesting('pro');
+      if (Platform.OS !== 'web') {
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (_) {}
+      }
       Alert.alert('Demo', 'Pro unlocked for this session.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
@@ -160,6 +199,15 @@ export default function Paywall() {
   };
 
   return (
+    <>
+    {showSuccessCelebration && (
+      <View style={styles.celebrationOverlay} pointerEvents="none">
+        <Animated.View style={[styles.celebrationIconWrap, { transform: [{ scale: celebrationScale }] }]}>
+          <Ionicons name="checkmark-circle" size={80} color={theme.colors.accent} />
+          <Text style={styles.celebrationText}>You're Pro!</Text>
+        </Animated.View>
+      </View>
+    )}
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>Go Pro</Text>
@@ -292,6 +340,7 @@ export default function Paywall() {
         <Text style={styles.backButtonText}>Maybe Later</Text>
       </TouchableOpacity>
     </ScrollView>
+    </>
   );
 }
 
@@ -492,5 +541,22 @@ const styles = StyleSheet.create({
   backButtonText: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
+  },
+  celebrationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  celebrationIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  celebrationText: {
+    ...theme.typography.h2,
+    color: theme.colors.accent,
+    marginTop: theme.spacing.sm,
+    fontWeight: '700',
   },
 });
