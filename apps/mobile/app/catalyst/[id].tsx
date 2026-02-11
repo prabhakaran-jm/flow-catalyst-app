@@ -52,7 +52,7 @@ export default function CatalystDetail() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { loading: authLoading, user } = useSupabase();
-  const { plan, presentPaywall } = useRevenueCat();
+  const { plan } = useRevenueCat();
   const { anonymousRunsUsed, loadAnonymousRunsUsed, incrementAnonymousRunsUsed, hasSeenProfileNudge, setHasSeenProfileNudge, loadHasSeenProfileNudge, loadSavedResults, saveResult } = useAppStore();
 
   const builtInId = id ? getBuiltInIdFromParam(id) : null;
@@ -123,6 +123,13 @@ export default function CatalystDetail() {
   const handleMagicWandPress = useCallback(
     async (field: string) => {
       if (!builtInId || !builtInCoach) return;
+
+      // Gate Magic Wand for Pro users — always show same custom paywall as Create / Upgrade
+      if (plan === 'free') {
+        router.push('/paywall');
+        return;
+      }
+
       const now = Date.now();
       if (now - lastMagicWandTime.current < MAGIC_WAND_COOLDOWN_MS) {
         showAlert('Hold on', 'Wait a few seconds before refining again.');
@@ -226,11 +233,7 @@ export default function CatalystDetail() {
     }
 
     if (mustUpgrade) {
-      if (skipRevenueCat) router.push('/paywall');
-      else {
-        const r = await presentPaywall();
-        if (r.showCustomPaywall) router.push('/paywall');
-      }
+      router.push('/paywall');
       return;
     }
 
@@ -241,19 +244,14 @@ export default function CatalystDetail() {
         return;
       }
       if (user && plan === 'free' && isProOnlyCoach) {
-        if (skipRevenueCat) router.push('/paywall');
-        else {
-          const r = await presentPaywall();
-          if (r.showCustomPaywall) router.push('/paywall');
-        }
+        router.push('/paywall');
         return;
       }
       if (user && plan === 'free' && !skipRevenueCat) {
         const reached = await hasReachedDailyLimit();
         if (reached) {
           showAlert('Daily limit reached', 'Upgrade to Pro for unlimited runs.');
-          const r = await presentPaywall();
-          if (r.showCustomPaywall) router.push('/paywall');
+          router.push('/paywall');
           return;
         }
       } else if (!user && anonymousRunsUsed >= 1) {
@@ -267,9 +265,8 @@ export default function CatalystDetail() {
         router.push('/signin');
         return;
       }
-      if (plan === 'free' && !skipRevenueCat) {
-        const r = await presentPaywall();
-        if (r.showCustomPaywall) router.push('/paywall');
+      if (plan === 'free') {
+        router.push('/paywall');
         return;
       }
     }
@@ -334,11 +331,7 @@ export default function CatalystDetail() {
       setError(msg);
       if (msg.includes('Daily limit reached')) {
         showAlert('Daily limit reached', 'Upgrade to Pro for unlimited runs.');
-        if (skipRevenueCat) router.push('/paywall');
-        else {
-          const r = await presentPaywall();
-          if (r.showCustomPaywall) router.push('/paywall');
-        }
+        router.push('/paywall');
       }
     } finally {
       setLoading(false);
@@ -364,11 +357,7 @@ export default function CatalystDetail() {
     const count = useAppStore.getState().savedResults.length;
     if (plan === 'free' && count >= 10) {
       showAlert('Pro keeps everything.', 'Upgrade to save more.');
-      if (skipRevenueCat) router.push('/paywall');
-      else {
-        const r = await presentPaywall();
-        if (r.showCustomPaywall) router.push('/paywall');
-      }
+      router.push('/paywall');
       return;
     }
     try {
@@ -507,6 +496,12 @@ export default function CatalystDetail() {
           )}
         </View>
         {displayDesc && <Text style={styles.description}>{displayDesc}</Text>}
+        {isAnonymous && anonymousRunsUsed < 1 && (
+          <View style={styles.anonymousBadge}>
+            <Ionicons name="gift-outline" size={14} color={theme.colors.accent} />
+            <Text style={styles.anonymousBadgeText}>1 free run remaining</Text>
+          </View>
+        )}
         {freeUserCanRun && (
           <Text style={styles.runCount}>
             {dailyRuns}/3 runs today (Free)
@@ -521,13 +516,7 @@ export default function CatalystDetail() {
           </Text>
           <TouchableOpacity
             style={styles.upgradeButton}
-            onPress={async () => {
-              if (skipRevenueCat) router.push('/paywall');
-              else {
-                const r = await presentPaywall();
-                if (r.showCustomPaywall) router.push('/paywall');
-              }
-            }}
+            onPress={() => router.push('/paywall')}
           >
             <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
           </TouchableOpacity>
@@ -822,6 +811,24 @@ const styles = StyleSheet.create({
   headerDeleteText: { ...theme.typography.bodySmall, color: theme.colors.error, fontWeight: '600' },
   title: { ...theme.typography.h2, color: theme.colors.text, flex: 1 },
   description: { ...theme.typography.body, color: theme.colors.textSecondary, marginTop: theme.spacing.xs },
+  anonymousBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.colors.accentLightBackground,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.full,
+    alignSelf: 'flex-start',
+    marginTop: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  anonymousBadgeText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.accent,
+    fontWeight: '600',
+  },
   runCount: { ...theme.typography.bodySmall, color: theme.colors.textSecondary, marginTop: theme.spacing.xs },
   limitWarning: {
     backgroundColor: '#FEF3C7',

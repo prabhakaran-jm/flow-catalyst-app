@@ -238,6 +238,7 @@ export interface Profile {
   domain: string | null;
   work_style: string | null;
   values: string[] | null;
+  plan: 'free' | 'pro';
 }
 
 /**
@@ -273,6 +274,7 @@ export async function updateProfile(updates: {
   domain?: string | null;
   work_style?: string | null;
   values?: string[] | null;
+  plan?: 'free' | 'pro';
 }): Promise<Profile> {
   const {
     data: { user: authUser },

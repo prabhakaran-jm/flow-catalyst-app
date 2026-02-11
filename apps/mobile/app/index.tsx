@@ -60,6 +60,7 @@ export default function Index() {
   const { hasCompletedOnboarding, onboardingLoaded, loadHasCompletedOnboarding } = useAppStore();
   const [searchQuery, setSearchQuery] = useState('');
   const dailyNudge = useMemo(() => getDailyNudge(), []);
+  const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat === true;
 
   // Load onboarding state and redirect if not completed
   useEffect(() => {
@@ -86,15 +87,29 @@ export default function Index() {
         router.push('/paywall');
         return;
       }
-      const r = await presentPaywall();
-      if (r.unlocked) router.push(`/catalyst/builtin-${coachId}`);
-      else if (r.showCustomPaywall) router.push('/paywall');
+      // Navigate to custom paywall so user always sees pricing (RevenueCat UI can hang on Android)
+      router.push('/paywall');
       return;
     }
     router.push(`/catalyst/builtin-${coachId}`);
   };
 
-  const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
+  const handleCreatePress = async () => {
+    if (!user) {
+      router.push('/signin');
+      return;
+    }
+    if (plan === 'free') {
+      if (skipRevenueCat) {
+        router.push('/paywall');
+        return;
+      }
+      // Navigate to custom paywall so user always sees pricing (RevenueCat UI can hang on Android)
+      router.push('/paywall');
+      return;
+    }
+    router.push('/catalyst/create');
+  };
 
   const searchLower = searchQuery.trim().toLowerCase();
   const filteredBuiltIn = searchLower
@@ -120,27 +135,28 @@ export default function Index() {
       contentContainerStyle={[styles.content, { paddingBottom: theme.spacing.md + bottomPadding }]}
     >
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.title}>Choose Your Coach</Text>
-          <View style={styles.headerActions}>
-            <TouchableOpacity onPress={() => router.push('/saved' as any)} style={styles.profileButton}>
-              <Text style={styles.profileButtonText}>Saved</Text>
-            </TouchableOpacity>
-            {user ? (
-              <>
-                <TouchableOpacity onPress={() => router.push('/profile')} style={styles.profileButton}>
-                  <Text style={styles.profileButtonText}>Profile</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
-                  <Text style={styles.signOutText}>Sign Out</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <TouchableOpacity onPress={() => router.push('/signin')} style={styles.signOutButton}>
-                <Text style={styles.signOutText}>Sign In</Text>
+        <Text style={styles.title}>Choose Your Coach</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleCreatePress} style={styles.profileButton}>
+            <Text style={styles.profileButtonText}>Create</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/saved' as any)} style={styles.profileButton}>
+            <Text style={styles.profileButtonText}>Saved</Text>
+          </TouchableOpacity>
+          {user ? (
+            <>
+              <TouchableOpacity onPress={() => router.push('/profile')} style={styles.profileButton}>
+                <Text style={styles.profileButtonText}>Profile</Text>
               </TouchableOpacity>
-            )}
-          </View>
+              <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
+                <Text style={styles.signOutText}>Sign Out</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity onPress={() => router.push('/signin')} style={styles.signOutButton}>
+              <Text style={styles.signOutText}>Sign In</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={18} color={theme.colors.textSecondary} style={styles.searchIcon} />
@@ -217,18 +233,18 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   content: { padding: theme.spacing.md },
   header: { marginBottom: theme.spacing.xl },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
   title: {
     ...theme.typography.h1,
     color: theme.colors.text,
-    flex: 1,
+    marginBottom: theme.spacing.sm,
   },
-  headerActions: { flexDirection: 'row', gap: theme.spacing.md, alignItems: 'center' },
+  headerActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+  },
   profileButton: { padding: theme.spacing.xs },
   profileButtonText: { ...theme.typography.bodySmall, color: theme.colors.text },
   signOutButton: { padding: theme.spacing.xs },

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { theme } from '@/theme';
 import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
@@ -43,7 +44,7 @@ const DEMO_OPTIONS = [
   { id: 'annual', title: 'Annual', period: '/year', price: 'Free for demo' },
 ];
 
-const OFFERINGS_LOAD_TIMEOUT_MS = 12000;
+const OFFERINGS_LOAD_TIMEOUT_MS = 10000;
 
 export default function Paywall() {
   const router = useRouter();
@@ -72,10 +73,13 @@ export default function Paywall() {
     return getPackageOptions(current.availablePackages);
   }, [offerings]);
 
+  // Fetch offerings only when we don't already have packages (avoids flicker and repeated loading).
+  // refreshEntitlements is safe to call on mount for up-to-date plan.
   useEffect(() => {
     refreshEntitlements();
+    if (packageOptions.length > 0) return; // Already have pricing; don't re-fetch and re-enter loading
     fetchOfferings();
-  }, [fetchOfferings, refreshEntitlements]);
+  }, [refreshEntitlements, fetchOfferings, packageOptions.length]);
 
   useEffect(() => {
     if (packageOptions.length > 0) {
@@ -277,6 +281,13 @@ export default function Paywall() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.rcStatus}>
+        <Ionicons name="shield-checkmark-outline" size={12} color={theme.colors.textSecondary} />
+        <Text style={styles.rcStatusText}>
+          Secured by RevenueCat {isDemoMode ? '(Demo Mode)' : ''}
+        </Text>
+      </View>
+
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Text style={styles.backButtonText}>Maybe Later</Text>
       </TouchableOpacity>
@@ -457,6 +468,21 @@ const styles = StyleSheet.create({
   legalSeparator: {
     ...theme.typography.bodySmall,
     color: theme.colors.textSecondary,
+  },
+  rcStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: theme.spacing.lg,
+    opacity: 0.6,
+  },
+  rcStatusText: {
+    ...theme.typography.bodySmall,
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   backButton: {
     marginTop: theme.spacing.lg,

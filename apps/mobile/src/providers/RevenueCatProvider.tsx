@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 // @ts-ignore - react-native-purchases types will be available after package installation
 import Purchases, { CustomerInfo, PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { useSupabase } from './SupabaseProvider';
 import { presentRevenueCatPaywall } from '@/src/lib/presentRevenueCatPaywall';
+import { updateProfile } from '@/src/lib/api';
 
 // Get RevenueCat API keys from env.ts (local) or Expo Constants (EAS build)
 function getRevenueCatApiKey(platform: 'ios' | 'android'): string | undefined {
@@ -164,29 +165,40 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   }, [user?.id, isInitialized]);
 
   /**
-   * Refresh entitlements from RevenueCat
+   * Refresh entitlements from RevenueCat.
+   * Memoized so paywall (and other consumers) don't re-run effects on every provider render.
    */
-  const refreshEntitlements = async (): Promise<void> => {
+  const refreshEntitlements = useCallback(async (): Promise<void> => {
     try {
       const customerInfo: CustomerInfo = await Purchases.getCustomerInfo();
       
       // Check if user has active 'pro' entitlement
-      // Adjust this based on your RevenueCat entitlement identifier
       const isPro = customerInfo.entitlements.active['pro'] !== undefined;
-      setPlan(isPro ? 'pro' : 'free');
+      const nextPlan = isPro ? 'pro' : 'free';
+      setPlan(nextPlan);
+
+      // Sync plan to Supabase profile for server-side rate limit bypass
+      if (user?.id) {
+        try {
+          await updateProfile({ plan: nextPlan });
+        } catch (syncError) {
+          console.warn('[RevenueCat] Failed to sync plan to Supabase profile:', syncError);
+        }
+      }
     } catch (error) {
       console.error('Failed to refresh entitlements:', error);
       // On error, default to free plan
       setPlan('free');
     }
-  };
+  }, [user?.id]);
 
   /**
    * Fetch current offerings (for paywall pricing display).
    * No-ops until SDK is initialized; auto-called when init completes.
    * Uses a timeout so the paywall never spins forever.
+   * Memoized so paywall doesn't re-fetch on every provider render (avoids flickering).
    */
-  const fetchOfferings = async (): Promise<void> => {
+  const fetchOfferings = useCallback(async (): Promise<void> => {
     const extra = Constants.expoConfig?.extra || {};
     if (extra.skipRevenueCat) {
       setOfferings(null);
@@ -219,7 +231,7 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     } finally {
       setLoadingOfferings(false);
     }
-  };
+  }, [isInitialized]);
 
   /**
    * Purchase a specific package (used by paywall for selected option).

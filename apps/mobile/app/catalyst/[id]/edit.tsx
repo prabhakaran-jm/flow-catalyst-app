@@ -12,7 +12,7 @@ export default function EditCatalyst() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { loading: authLoading, user } = useSupabase();
-  const { plan, presentPaywall } = useRevenueCat();
+  const { plan } = useRevenueCat();
 
   const [catalyst, setCatalyst] = useState<Catalyst | null>(null);
   const [name, setName] = useState('');
@@ -32,10 +32,9 @@ export default function EditCatalyst() {
   const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
   useEffect(() => {
     if (!authLoading && user && plan === 'free') {
-      if (skipRevenueCat) router.replace('/paywall');
-      else void presentPaywall().then((r) => { if (r.showCustomPaywall) router.replace('/paywall'); });
+      router.replace('/paywall');
     }
-  }, [plan, authLoading, user, router, skipRevenueCat, presentPaywall]);
+  }, [plan, authLoading, user, router, skipRevenueCat]);
 
   useEffect(() => {
     const load = async () => {

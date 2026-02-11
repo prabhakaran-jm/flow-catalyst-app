@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useSupabase } from './SupabaseProvider';
+import { updateProfile } from '@/src/lib/api';
 
 export type Plan = 'free' | 'pro';
 
@@ -29,11 +31,23 @@ interface RevenueCatProviderProps {
  * free plan only - no native Purchases SDK is loaded.
  */
 export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
+  const { user } = useSupabase();
   const [plan, setPlan] = useState<Plan>('free');
 
   const refreshEntitlements = async (): Promise<void> => {
-    setPlan('free');
+    // In stub, we just sync the current local plan to Supabase if logged in
+    if (user?.id) {
+      try {
+        await updateProfile({ plan });
+      } catch (e) {
+        console.warn('[RevenueCat Stub] Failed to sync plan:', e);
+      }
+    }
   };
+
+  useEffect(() => {
+    if (user?.id) refreshEntitlements();
+  }, [user?.id, plan]);
 
   const purchasePro = async (): Promise<void> => {
     throw new Error(
@@ -52,8 +66,15 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
   };
 
   // Allow plan switching in stub (preview builds) so testers can try Pro features without real purchase
-  const setPlanForTesting = (newPlan: Plan) => {
+  const setPlanForTesting = async (newPlan: Plan) => {
     setPlan(newPlan);
+    if (user?.id) {
+      try {
+        await updateProfile({ plan: newPlan });
+      } catch (e) {
+        console.warn('[RevenueCat Stub] Failed to sync plan:', e);
+      }
+    }
   };
 
   const presentPaywall = async () => ({ unlocked: false, showCustomPaywall: true });

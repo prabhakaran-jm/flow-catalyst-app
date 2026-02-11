@@ -2,6 +2,24 @@
 
 This guide configures RevenueCat so the paywall shows real offerings and judges can test purchases. Without this, the app shows "No offerings available".
 
+## Demo / judging without real purchases
+
+For **demos and judging**, use the **same build** you ship (internal or production). You do **not** need to switch to RevenueCat’s “Test configuration” API key for the build you give to judges.
+
+- **Android (Google Play):** Add judges’ **Gmail addresses** as **License testers**: Play Console → **Settings** → **License testing** → add addresses. When they install from Internal testing and tap “Subscribe”, they see the real paywall but **are not charged**; the subscription is in test mode. **If you get a real bank/payment approval** during Internal Testing, the **Google account signed in on the device** is not in the License testers list—add that Gmail in Play Console → **Settings** → **License testing** (no app update needed).
+- **iOS:** Add judges as **Sandbox testers** in App Store Connect (Users and Access → Sandbox → Testers). They sign in with that Sandbox Apple ID on the device; TestFlight purchases use sandbox and are not charged.
+
+RevenueCat’s **Test configuration** (test API key, sandbox mode) is for builds that **never talk to the store** (e.g. automated tests). For live demos and judging, use license testers / sandbox testers so the app still talks to the store and shows real pricing, without real money.
+
+### Downgrade after a test purchase
+
+To test the free tier again (or run the purchase flow again) after a test subscription:
+
+- **Android (Google Play):** On the device: **Play Store** → **Menu** (☰) → **Subscriptions** (or **Account** → **Payments and subscriptions** → **Subscriptions**). Find **Flow Catalyst** and tap **Cancel subscription**. Access continues until the current period ends; then the app will show the free plan. You can also **Clear app data** for the app (Settings → Apps → Flow Catalyst → Storage → Clear data) so the next launch re-checks entitlements—useful if the subscription has already expired in test mode.
+- **iOS (Sandbox):** On the device: **Settings** → **Apple ID** (top) → **Subscriptions** → select the app → **Cancel Subscription**. Sandbox subscriptions use shortened renewal times (e.g. monthly renews in 5 minutes), so they expire quickly. To get a "fresh" user with no subscription, sign out of the Sandbox account: **Settings** → **App Store** → **Sandbox Account** → Sign out; then sign in with a different Sandbox tester or the same one after the subscription has lapsed.
+
+After cancelling, open the app again; use **Restore purchase** on the paywall if you expect an active subscription, or wait for the period to end so the app shows the free tier.
+
 ## Prerequisites
 
 - [RevenueCat account](https://app.revenuecat.com)
@@ -67,6 +85,123 @@ Production builds already read from `Constants.expoConfig.extra.REVENUECAT_API_K
 
 ---
 
+## Android / Play Store integration (step-by-step)
+
+Use the same product IDs and entitlement as iOS so one offering works on both platforms.
+
+### 1. Google Play Console: create app and subscriptions
+
+1. Go to [Google Play Console](https://play.google.com/console).
+2. **Create the app** (if not already): Add app → Fill in details → Create. Use **package name** exactly: **`com.flowcatalyst.app`** (must match `apps/mobile/app.json` → `expo.android.package`).
+3. **Subscriptions:**
+   - Left menu → **Monetize** → **Products** → **Subscriptions**.
+   - If you only see “Your app doesn’t have any subscriptions yet” and **Upload a new APK** (no “Create subscription” button), upload an AAB first: **Test and release** → **Internal testing** → **Create new release** → upload your AAB (e.g. from `eas build --platform android --profile production`) → **Save** and **Start rollout**. Then return to **Monetize** → **Products** → **Subscriptions**; **Create subscription** should appear.
+   - Click **Create subscription** and create two subscriptions with these **Product IDs** (must match RevenueCat and the code):
+
+| Product ID                 | Type        | Notes                    |
+|----------------------------|------------|--------------------------|
+| `flow_catalyst_monthly`    | Subscription | Add at least one base plan (monthly). |
+| `flow_catalyst_annual`    | Subscription | Add at least one base plan (yearly).  |
+
+4. For each product: set **name**, **description**, and at least one **base plan** (price and billing period). Save and activate.
+5. **Put the app on a testing track** (required for products to resolve):
+   - **Testing** → **Internal testing** (or Closed testing) → **Create new release** → Upload an **AAB** (e.g. from `eas build --platform android --profile production`) → Save and start rollout.
+6. **License testers** (so you can test purchases without being charged):
+   - **Settings** (gear) → **License testing** → Add the **Gmail** addresses that will test purchases.
+
+### 2. Google Cloud: service account for RevenueCat
+
+RevenueCat needs a **service account** to verify Google Play purchases.
+
+1. Open [Google Cloud Console](https://console.cloud.google.com) and select (or create) the project **linked to your Play Console** (Play Console → Settings → Developer account → API access uses this project).
+2. **IAM & Admin** → **Service accounts** → **Create service account**.
+   - Name: e.g. `RevenueCat` → Create → Done.
+3. Create a **JSON key** for that service account:
+   - Click the service account → **Keys** → **Add key** → **Create new key** → **JSON** → Create. Save the `.json` file securely.
+4. **Grant the service account access in Play Console:**
+   - Play Console → left menu → **Users and permissions** ([direct link](https://play.google.com/console/users-and-permissions)).
+   - Click **Invite new users**.
+   - In **Email address**, enter the **service account email** from your JSON key (the `client_email` value, e.g. `something@your-project.iam.gserviceaccount.com`).
+   - Open the **Account permissions** tab and grant at least:
+     - **View app information and download bulk reports (read-only)**
+     - **View financial data, orders, and cancellation survey responses**
+     - **Manage orders and subscriptions** (if available; otherwise “View financial data” is often enough for RevenueCat).
+   - Under **App access**, ensure the service account has access to your **Flow Catalyst** app (e.g. “All apps” or select the app).
+   - Click **Invite user** (or **Send invite**). The service account will appear in the users list; it does not need to “accept” the invite.
+   - It can take **up to 24–36 hours** for Google to propagate permissions; RevenueCat may show “credentials need attention” until then.
+
+5. **Enable Google Play APIs in the same Google Cloud project** (required for RevenueCat to validate):
+   - [Google Cloud Console](https://console.cloud.google.com) → select the **same project** where you created the service account.
+   - **APIs & Services** → **Library** → search and **Enable**:
+     - **Google Play Android Developer API** ([direct link](https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com))
+     - **Google Play Developer Reporting API** ([direct link](https://console.cloud.google.com/apis/library/playdeveloperreporting.googleapis.com))
+   - Without these, RevenueCat will show “Could not validate subscriptions API”, “Permissions to call inappproducts API”, and “Permissions to call monetization API”.
+
+### 3. RevenueCat: add Android app and credentials
+
+1. [RevenueCat Dashboard](https://app.revenuecat.com) → your project.
+2. **Apps** → **+ New** → **Google Play**.
+   - **App name:** Flow Catalyst (or any label).
+   - **Package name:** `com.flowcatalyst.app` (must match Play Console and `app.json`).
+   - Save.
+3. **Service account credentials:**
+   - Open the new Android app in RevenueCat → **Service account** (or **Credentials**) section.
+   - Upload the **JSON key file** you downloaded from Google Cloud (or paste its contents if the UI allows). Save.
+4. **Products:** Under this Android app, add products:
+   - **Google Play Product ID:** `flow_catalyst_monthly`.
+   - **Google Play Product ID:** `flow_catalyst_annual`.
+5. **Entitlement:** Use the same **`pro`** entitlement as iOS. In **Entitlements** → **pro** → **Attach** (or **Associated products**) → attach both Android products.
+6. **Offerings:** Use the same **default** offering. In **Offerings** → **default** → **Packages**:
+   - Ensure **$rc_monthly** has the **Android** product `flow_catalyst_monthly` linked (in addition to iOS if already set).
+   - Ensure **$rc_annual** has the **Android** product `flow_catalyst_annual` linked.
+7. **API Keys:** Copy the **Public app-specific API key** for this Android app (starts with `goog_`). You’ll use it in the app and EAS.
+
+### 4. Put the Android API key in the app
+
+- **EAS builds (production):**  
+  EAS Dashboard → your project → **Environment variables** → **production** → add:
+  - **REVENUECAT_API_KEY_ANDROID** = `goog_xxxxxxxx` (your Android public key).
+
+- **Local / env:**  
+  In `apps/mobile/src/env.ts` (or env.example):
+  - `REVENUECAT_API_KEY_ANDROID: 'goog_xxxxxxxx'`
+
+Production builds read from `Constants.expoConfig.extra.REVENUECAT_API_KEY_ANDROID`, which EAS injects from the environment variable.
+
+### 5. Build and test on Android
+
+1. Build an Android AAB with the key set:  
+   `eas build --platform android --profile production`
+2. Upload the AAB to **Internal testing** (or Closed testing) in Play Console if you haven’t already.
+3. Install the app from the **Internal testing** link (or download from Play Console).
+4. On the device, ensure you’re signed in with a **license tester** Gmail. Open the app → paywall → confirm offerings load and test purchase/restore.
+
+**If products don’t load (Error 23 on Android):** Confirm the app is on at least **Internal testing** and the release is rolled out; confirm product IDs match exactly; wait up to 24–36 hours after adding the service account for RevenueCat to validate credentials.
+
+#### “Credentials need attention” (subscriptions / inappproducts / monetization API)
+
+If RevenueCat shows **Credentials need attention** with red Xs for **subscriptions API**, **inappproducts API**, or **monetization API**:
+
+1. **Google Cloud:** In the **same project** as the service account, enable:
+   - [Google Play Android Developer API](https://console.cloud.google.com/apis/library/androidpublisher.googleapis.com)
+   - [Google Play Developer Reporting API](https://console.cloud.google.com/apis/library/playdeveloperreporting.googleapis.com)
+2. **Play Console → Users and permissions:** Open the invited service account and ensure **Account permissions** include:
+   - **View app information and download bulk reports (read-only)** (for inappproducts)
+   - **View financial data, orders, and cancellation survey responses** (for subscriptions + monetization)
+   - **Manage orders and subscriptions** (for subscriptions)
+3. **App access:** Under **App permissions** for that user, ensure your **Flow Catalyst** app is included (or “All apps”).
+4. **Re-upload** the same JSON in RevenueCat and click the refresh icon to re-validate. Changes can take **up to 24–36 hours** to propagate; a workaround that sometimes speeds validation: in Play Console → **Monetize** → **Products** → **Subscriptions**, edit one product’s description, save, then revert if you like.
+
+#### “Illegal parameters pub_sub_topic_id” (Google developer notifications)
+
+If you get this error when saving after connecting Pub/Sub:
+
+- **Invalid topic name:** The Topic ID must be a full resource name like `projects/PROJECT_ID/topics/TOPIC_NAME`. The **topic name** (the part after `topics/`) must not end with a hyphen and must exist in Google Cloud Pub/Sub. If you see something like `.../topics/Play-Store-` (trailing hyphen or truncated), it can cause this error.
+- **Fix:** In RevenueCat, click **Disconnect from Google** (you must disconnect before changing the Topic ID). Then click **Connect to Google** again so RevenueCat generates a **new** topic ID. Do not manually edit the topic to end with a hyphen or leave it incomplete. Copy the new topic ID into Play Console → **Monetize** → **Monetization setup** → **Real-time developer notifications** → Topic name, then **Save** in Play Console. Back in RevenueCat, click **Save changes**.
+- **Pub/Sub API:** Ensure [Pub/Sub API](https://console.cloud.google.com/flows/enableapi?apiid=pubsub) is enabled in the **same** Google Cloud project as your service account.
+
+---
+
 ## 1. Add API Keys to the App (all platforms)
 
 In `apps/mobile/src/env.ts` (if used locally):
@@ -105,9 +240,7 @@ See **iOS integration (step-by-step)** above. Summary: create a subscription gro
 
 ### Google Play Console (Android)
 
-1. Monetize → Products → Subscriptions
-2. Create monthly and annual subscriptions
-3. Use the same product IDs as in RevenueCat
+See **Android / Play Store integration (step-by-step)** above for the full flow. Summary: create subscriptions `flow_catalyst_monthly` and `flow_catalyst_annual`, put the app on Internal testing, add license testers, create a Google Cloud service account and grant it access in Play Console, then add the Android app and upload the JSON key in RevenueCat and link the same products to the **default** offering and **pro** entitlement.
 
 ## 5. Verify Setup
 

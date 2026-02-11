@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { useSupabase } from './SupabaseProvider';
+import { updateProfile } from '@/src/lib/api';
 
 export type Plan = 'free' | 'pro';
 
@@ -28,12 +30,23 @@ interface RevenueCatProviderProps {
  * that always returns 'free' plan. Purchases must be done on iOS/Android native apps.
  */
 export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
+  const { user } = useSupabase();
   const [plan, setPlan] = useState<Plan>('free');
 
   const refreshEntitlements = async (): Promise<void> => {
-    // No-op on web - RevenueCat SDK doesn't support web
-    setPlan('free');
+    // Sync local plan to Supabase if logged in
+    if (user?.id) {
+      try {
+        await updateProfile({ plan });
+      } catch (e) {
+        console.warn('[RevenueCat Web] Failed to sync plan:', e);
+      }
+    }
   };
+
+  useEffect(() => {
+    if (user?.id) refreshEntitlements();
+  }, [user?.id, plan]);
 
   const purchasePro = async (): Promise<void> => {
     throw new Error(
@@ -51,9 +64,16 @@ export function RevenueCatProvider({ children }: RevenueCatProviderProps) {
     throw new Error('Restore is not available on web.');
   };
 
-  const setPlanForTesting = (newPlan: Plan) => {
+  const setPlanForTesting = async (newPlan: Plan) => {
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
       setPlan(newPlan);
+      if (user?.id) {
+        try {
+          await updateProfile({ plan: newPlan });
+        } catch (e) {
+          console.warn('[RevenueCat Web] Failed to sync plan:', e);
+        }
+      }
     }
   };
 

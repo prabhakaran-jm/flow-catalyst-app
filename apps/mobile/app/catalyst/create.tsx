@@ -11,7 +11,8 @@ import {
   Vibration,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { theme } from '@/theme';
 import MagicWandButton from '@/src/components/MagicWandButton';
@@ -25,7 +26,7 @@ import { useRevenueCat } from '@/src/providers/RevenueCatProvider';
 export default function CreateCatalyst() {
   const router = useRouter();
   const { loading: authLoading, user } = useSupabase();
-  const { plan, presentPaywall } = useRevenueCat();
+  const { plan } = useRevenueCat();
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,12 +35,13 @@ export default function CreateCatalyst() {
   }, [user, authLoading, router]);
 
   const skipRevenueCat = Constants.expoConfig?.extra?.skipRevenueCat;
+  const hasRedirectedToPaywall = useRef(false);
   useEffect(() => {
-    if (!authLoading && user && plan === 'free') {
-      if (skipRevenueCat) router.replace('/paywall');
-      else void presentPaywall().then((r) => { if (r.showCustomPaywall) router.replace('/paywall'); });
+    if (!authLoading && user && plan === 'free' && !hasRedirectedToPaywall.current) {
+      hasRedirectedToPaywall.current = true;
+      router.replace('/paywall');
     }
-  }, [plan, authLoading, user, router, skipRevenueCat, presentPaywall]);
+  }, [plan, authLoading, user, router, skipRevenueCat]);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -94,11 +96,7 @@ export default function CreateCatalyst() {
 
   const handleSave = async () => {
     if (plan === 'free') {
-      if (skipRevenueCat) router.push('/paywall');
-      else {
-        const r = await presentPaywall();
-        if (r.showCustomPaywall) router.push('/paywall');
-      }
+      router.push('/paywall');
       return;
     }
 
@@ -145,10 +143,35 @@ export default function CreateCatalyst() {
     }
   };
 
-  if (authLoading || (plan === 'free' && !skipRevenueCat)) {
+  if (authLoading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color={theme.colors.accent} />
+      </View>
+    );
+  }
+
+  if (plan === 'free' && !skipRevenueCat) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <View style={styles.upgradeCard}>
+          <Ionicons name="sparkles" size={48} color={theme.colors.accent} />
+          <Text style={styles.upgradeTitle}>Custom Coaches are Pro</Text>
+          <Text style={styles.upgradeSubtitle}>
+            Unlock the ability to create your own specialized AI coaches with custom logic and prompts.
+          </Text>
+          <TouchableOpacity
+            style={styles.upgradeHeroButton}
+            onPress={async () => {
+              router.push('/paywall');
+            }}
+          >
+            <Text style={styles.upgradeHeroButtonText}>Upgrade to Pro</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.maybeLaterButton} onPress={() => router.back()}>
+            <Text style={styles.maybeLaterButtonText}>Maybe Later</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -415,5 +438,57 @@ const styles = StyleSheet.create({
     ...theme.typography.body,
     color: theme.colors.background,
     fontWeight: '600',
+  },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  upgradeCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.xl,
+    alignItems: 'center',
+    width: '100%',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+      android: { elevation: 4 },
+    }),
+  },
+  upgradeTitle: {
+    ...theme.typography.h2,
+    color: theme.colors.text,
+    marginTop: theme.spacing.lg,
+    textAlign: 'center',
+  },
+  upgradeSubtitle: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.xl,
+  },
+  upgradeHeroButton: {
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    width: '100%',
+    alignItems: 'center',
+  },
+  upgradeHeroButtonText: {
+    ...theme.typography.body,
+    color: theme.colors.background,
+    fontWeight: '700',
+  },
+  maybeLaterButton: {
+    marginTop: theme.spacing.md,
+    padding: theme.spacing.sm,
+  },
+  maybeLaterButtonText: {
+    ...theme.typography.bodySmall,
+    color: theme.colors.textSecondary,
   },
 });
