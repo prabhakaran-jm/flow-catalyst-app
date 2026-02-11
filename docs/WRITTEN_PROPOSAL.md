@@ -75,9 +75,9 @@ Users adjust tone and depth using a simple slider instead of rewriting prompts.
 
 ### 2. Coaching Refinement (Magic Wand)
 
-Instead of generating immediately, the app can refine context or ask clarifying questions — simulating real coaching rather than passive AI output.
+Instead of generating immediately, the app can refine context or ask clarifying questions - simulating real coaching rather than passive AI output.
 
-This reframes AI from open-ended conversation to structured execution — aligned with system builders who value clarity over exploration.
+This reframes AI from open-ended conversation to structured execution - aligned with system builders who value clarity over exploration.
 
 ## Monetization Strategy
 
