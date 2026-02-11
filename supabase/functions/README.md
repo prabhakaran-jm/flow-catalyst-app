@@ -27,7 +27,7 @@ Executes a catalyst with provided inputs and returns output.
 }
 ```
 
-**AI Integration**: Uses OpenAI (default) or Anthropic to generate responses. See `AI_INTEGRATION_SETUP.md` for configuration.
+**AI**: Set `AI_PROVIDER`, `OPENROUTER_API_KEY` (or `GEMINI_API_KEY`) in Supabase Edge Function secrets. See `docs/QUICK_START.md`.
 
 ### refine-coach
 Coaching-focused refinement for built-in coaches. Returns refined inputs and optional clarifying questions.
@@ -95,7 +95,7 @@ Set these in your Supabase project settings:
 - `ANTHROPIC_MODEL` - Model name (default: `claude-3-5-sonnet-20241022`)
 - `ANTHROPIC_MAX_TOKENS` - Max tokens (default: `1000`)
 
-See `AI_INTEGRATION_SETUP.md` for detailed setup instructions.
+See `docs/QUICK_START.md` for deploy steps.
 
 ## Authentication
 

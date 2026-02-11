@@ -218,7 +218,7 @@ For the paywall to show offerings (not "No offerings available"):
 3. **Products**: Link packages to subscriptions in App Store Connect / Play Console
 4. **Keys**: Add `REVENUECAT_API_KEY_IOS` and `REVENUECAT_API_KEY_ANDROID` to env
 
-See **`docs/REVENUECAT_SETUP.md`** for step-by-step instructions.
+Create `pro` entitlement, add offerings (`$rc_monthly`, `$rc_annual`), link to store products, add license testers (Play) or sandbox testers (iOS).
 
 ## Testing Pro Features Without RevenueCat
 
@@ -236,17 +236,11 @@ While waiting for Play Store / App Store developer activation:
    supabase functions deploy run-catalyst --no-verify-jwt
    ```
 
-## Testing & Deployment
+## Docs
 
-- **Quick Start**: See `docs/QUICK_START.md` for immediate testing and deployment steps
-- **Testing Checklist**: See `docs/TESTING_CHECKLIST.md` for test cases
-- **Production Deploy**: See `docs/PRODUCTION_DEPLOY.md` for Supabase and EAS commands
-- **Shipyard iOS**: See `docs/SHIPYARD_IOS_SUBMISSION.md` for App Store submission
+- **Quick Start**: `docs/QUICK_START.md` – local dev, deploy, EAS build
 
-## Setup Guides
-
-- **AI Integration**: See `docs/AI_INTEGRATION_SETUP.md` for OpenRouter/OpenAI/Anthropic
-- **RevenueCat**: See `docs/REVENUECAT_SETUP.md` for entitlement, offerings, and product setup
+- **Legal**: `docs/legal/` – Terms, Privacy
 
 ## License
 
