@@ -2,24 +2,111 @@
 
 ## Problem
 
-Creators and writers often get stuck between having an idea and shipping it. Generic advice and endless AI chat leave them without clear, actionable next steps. They need focused guidance at the right moment—not another rabbit hole.
+Productivity-focused creators don't struggle with ideas.
+
+They struggle with execution.
+
+Generic advice and open-ended AI chat tools create more thinking, not more action. Creators need focused, contextual guidance at the exact moment they're stuck — not another blank prompt box.
+
+Simon's audience builds systems. They value clarity, minimal design, and tools that reduce friction.
+
+They don't want a chatbot.
+
+They want direction.
 
 ## Target Audience
 
-- **Writers and content creators** who want to move from draft zero to publishable
-- **Solo creators** who lack a coach or editor
-- **Anyone who gets stuck** on hooks, structure, decisions, or clarity—and wants a quick nudge, not a long session
+Flow Catalyst is built for:
+
+- Solo creators writing blogs, newsletters, and videos
+- Builders who value structured thinking
+- Writers who get stuck on hooks, clarity, and decisions
+- Productivity-focused users who want fast, actionable outputs
+- Simon @BetterCreating's audience who care about clean systems and momentum
 
 ## Solution
 
-Flow Catalyst offers **focused AI coaches** for specific creative tasks. Pick a coach (Hook, Outline, Block Breaker, Clarity, Decision), add your context, and get actionable guidance in seconds. The AI Magic Wand refines your input before generating. Pro users can create custom coaches with their own prompts and logic.
+Flow Catalyst is a minimalist AI coaching app.
+
+Instead of chat, users choose a focused **Coach**:
+
+- **Hook Coach**
+- **Outline Coach**
+- **Clarity Coach**
+- **Block Breaker Coach**
+- **Decision Coach**
+
+Each coach requires only:
+
+- 2 context inputs
+- 1 value lever (tone control)
+
+Within seconds, users receive:
+
+- A structured output
+- Clear steps
+- A "Do this now" action
+
+The **Magic Wand** refines inputs before generation, acting like a real coach asking better questions.
+
+Pro users can create custom coaches using their own templates and logic, turning personal workflows into reusable systems.
+
+The experience is intentionally minimal:
+
+> Pick a Coach. Answer two questions. Move forward in under a minute.
+
+## Innovation
+
+Flow Catalyst introduces two key UX innovations:
+
+### 1. Value Levers
+
+Users adjust tone and depth using a simple slider instead of rewriting prompts.
+
+### 2. Coaching Refinement (Magic Wand)
+
+Instead of generating immediately, the app can refine context or ask clarifying questions — simulating real coaching rather than passive AI output.
+
+This shifts AI from "chat assistant" to "structured coach."
 
 ## Monetization Strategy
 
-- **Free tier:** 1 anonymous run, 3 runs/day when signed in. Access to a subset of built-in coaches.
-- **Pro subscription:** Unlimited runs, all 5 coaches, Create Coach, AI Magic Wand refinement, save to library. Monthly and annual plans via RevenueCat.
-- **Implementation:** RevenueCat for subscription management. Custom paywall with offerings fetched from RevenueCat; purchase/restore flow integrated with App Store and Google Play.
+Flow Catalyst uses a clear freemium model.
+
+### Free Tier
+
+- 1 anonymous run
+- 3 runs per day (signed in)
+- Limited coaches
+- Save up to 10 results
+
+### Pro Subscription
+
+- Unlimited runs
+- All 5 coaches
+- Magic Wand refinement
+- Create Custom Coach
+- Unlimited saves
+
+Monthly and annual plans are powered by **RevenueCat**.
+
+The paywall dynamically fetches localized pricing from App Store / Google Play.
+
+The value proposition is clear:
+
+> If you rely on this tool to ship consistently, Pro removes all friction.
 
 ## Why Simon @BetterCreating
 
-Flow Catalyst aligns with BetterCreating’s focus on helping creators ship. The app turns advice into actions—exactly the kind of tool Simon’s audience can use to get unstuck and move forward.
+Simon's audience values:
+
+- Clean UX
+- System thinking
+- Practical tools
+- Shipping consistently
+
+Flow Catalyst embodies those values.
+
+It transforms advice into structured action. It reduces friction. It helps creators move from idea → execution in under a minute.
+
+This is not a demo app. It is a focused coaching tool designed for long-term use and monetization.
