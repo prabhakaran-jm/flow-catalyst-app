@@ -55,6 +55,16 @@ The experience is intentionally minimal:
 
 > Pick a Coach. Answer two questions. Move forward in under a minute.
 
+## Real-World Use Case  
+A creator writing a newsletter can:  
+Open Hook Coach  
+Refine their topic with Magic Wand  
+Adjust tone using Value Lever  
+Generate 10 hooks and a chosen best option  
+Copy and publish immediately  
+  
+What normally takes 20 minutes of iteration becomes a 60-second structured output.
+
 ## Innovation
 
 Flow Catalyst introduces two key UX innovations:
@@ -67,7 +77,7 @@ Users adjust tone and depth using a simple slider instead of rewriting prompts.
 
 Instead of generating immediately, the app can refine context or ask clarifying questions — simulating real coaching rather than passive AI output.
 
-This shifts AI from "chat assistant" to "structured coach."
+This reframes AI from open-ended conversation to structured execution — aligned with system builders who value clarity over exploration.
 
 ## Monetization Strategy
 
@@ -95,6 +105,9 @@ The paywall dynamically fetches localized pricing from App Store / Google Play.
 The value proposition is clear:
 
 > If you rely on this tool to ship consistently, Pro removes all friction.
+
+The subscription is positioned around momentum and consistency.  
+For creators who publish weekly or daily, removing generation limits and unlocking custom coaches turns Flow Catalyst into a reusable productivity system — not a one-time tool.  
 
 ## Why Simon @BetterCreating
 
